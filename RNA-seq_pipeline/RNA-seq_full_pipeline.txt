@@ -1,0 +1,1022 @@
+########################################################################
+# Alveolar macrophages paired-end RNA-seq: full bioinformatic pipeline #
+########################################################################
+
+
+##################
+# File check sum #
+##################
+
+# Move and rename raw data files received from BGI into storage directory
+cd /workspace/storage/nnalpas/ALV_MAC_RNAseq/F13TSFEUHT0200_BOSipaR/raw_data
+for file in `ls 130414*_CHKPEI12120043*.fq.gz`; do outfile=`echo $file | perl -p -e 's/130414_I\d{3}(_.*ACXX)(_.{2})_(.*)(_[1,2]\.fq\.gz)/Raw$1-$3$2$4/'`; mv ./$file /workspace/storage/nnalpas/ALV_MAC_RNAseq/fastq_sequence/raw_reads/DM-pool-A/$outfile; done;
+for file in `ls 130414*_CHKPEI12120044*.fq.gz`; do outfile=`echo $file | perl -p -e 's/130414_I\d{3}(_.*ACXX)(_.{2})_(.*)(_[1,2]\.fq\.gz)/Raw$1-$3$2$4/'`; mv ./$file /workspace/storage/nnalpas/ALV_MAC_RNAseq/fastq_sequence/raw_reads/DM-pool-B/$outfile; done;
+for file in `ls 130414*_CHKPEI12120045*.fq.gz`; do outfile=`echo $file | perl -p -e 's/130414_I\d{3}(_.*ACXX)(_.{2})_(.*)(_[1,2]\.fq\.gz)/Raw$1-$3$2$4/'`; mv ./$file /workspace/storage/nnalpas/ALV_MAC_RNAseq/fastq_sequence/raw_reads/DM-pool-C/$outfile; done;
+
+# Create and enter the md5sum output directory
+mkdir -p $HOME/scratch/ALV_MAC_RNAseq/md5check
+cd $HOME/scratch/ALV_MAC_RNAseq/md5check
+
+# Create shell script to calculate the md5sum on raw data fastq files
+for file in `find /workspace/storage/nnalpas/ALV_MAC_RNAseq/fastq_sequence/raw_reads -name *fq.gz`; do echo "md5sum $file >> md5sum_check.txt" >> md5sum.sh; done;
+
+# Split and run all scripts on Stampede server
+split -d -l 12 md5sum.sh md5sum.sh.
+for script in `ls md5sum.sh.*`
+do
+chmod 755 $script
+nohup ./$script > ${script}.nohup &
+done
+
+# Compare the md5sum obtained by us with the md5 from BGI
+cp /workspace/storage/nnalpas/ALV_MAC_RNAseq/fastq_sequence/MD5_raw.txt $HOME/scratch/ALV_MAC_RNAseq/md5check/MD5_raw_BGI.txt
+
+# Move and rename clean data files received from BGI into storage directory
+cd /workspace/storage/nnalpas/ALV_MAC_RNAseq/F13TSFEUHT0200_BOSipaR/clean_reads
+for file in `ls *CHKPEI12120043*.fq.gz`; do mv ./$file /workspace/storage/nnalpas/ALV_MAC_RNAseq/fastq_sequence/clean_reads/DM-pool-A/$file; done;
+for file in `ls *CHKPEI12120044*.fq.gz`; do mv ./$file /workspace/storage/nnalpas/ALV_MAC_RNAseq/fastq_sequence/clean_reads/DM-pool-B/$file; done;
+for file in `ls *CHKPEI12120045*.fq.gz`; do mv ./$file /workspace/storage/nnalpas/ALV_MAC_RNAseq/fastq_sequence/clean_reads/DM-pool-C/$file; done;
+
+# Check the md5sum to make sure of file integrity
+cd $HOME/scratch/ALV_MAC_RNAseq/md5check
+
+# Create shell script to calculate the md5sum on clean data fastq files
+for file in `find /workspace/storage/nnalpas/ALV_MAC_RNAseq/fastq_sequence/clean_reads -name *fq.gz`; do echo "md5sum $file >> md5sum_clean_check.txt" >> md5sum_clean.sh; done;
+
+# Split and run all scripts on Stampede server
+for script in `ls md5sum_clean.sh`
+do
+chmod 755 $script
+nohup ./$script > ${script}.nohup &
+done
+
+# Compare the md5sum obtained by us with the md5 from BGI
+cp /workspace/storage/nnalpas/ALV_MAC_RNAseq/fastq_sequence/MD5_clean.txt $HOME/scratch/ALV_MAC_RNAseq/md5check/MD5_clean_BGI.txt
+
+# The whole fastq_sequence directory can be changed to read and execute only, all write permission for everyone are removed
+chmod -R 555 /workspace/storage/nnalpas/ALV_MAC_RNAseq/fastq_sequence
+
+
+#######################################
+# FastQC quality check of fastq files #
+#######################################
+
+# Required software is FastQC, consult manual/tutorial for details: http://www.bioinformatics.babraham.ac.uk/projects/fastqc/
+
+# Create and enter the quality check output directory
+mkdir $HOME/scratch/ALV_MAC_RNAseq/quality_check
+cd $HOME/scratch/ALV_MAC_RNAseq/quality_check
+
+# Create shell script to perform FastQC quality check on your fastq files
+for file in `find /home/nnalpas/storage/ALV_MAC_RNAseq/fastq_sequence/raw_reads/ -name *fq.gz`; do echo "fastqc --noextract --nogroup -t 1 -o $HOME/scratch/ALV_MAC_RNAseq/quality_check $file" >> fastqc.sh; done;
+
+# Split and run all scripts on Stampede
+split -d -l 2 fastqc.sh fastqc.sh.
+for script in `ls fastqc.sh.*`
+do
+chmod 755 $script
+nohup ./$script > ${script}.nohup &
+done
+
+# Check all output from FastQC particularly for the level of reads duplication
+cd /home/dmagee/scratch/ALV_MAC_RNAseq/quality_check
+mkdir /home/dmagee/scratch/ALV_MAC_RNAseq/quality_check/tmp
+for file in `ls *_fastqc.zip`; do unzip $file -d /home/dmagee/scratch/ALV_MAC_RNAseq/quality_check/tmp; done;
+for file in `find /home/dmagee/scratch/ALV_MAC_RNAseq/quality_check/tmp -name summary.txt`; do m $file | grep "FAIL" >> fastqc_unfiltered_fail.txt; done;
+rm -rf /home/dmagee/scratch/ALV_MAC_RNAseq/quality_check/tmp
+
+
+#####################################
+# Deconvolution of pool fastq files #
+#####################################
+
+# Requirements are Perl and String::Approx perl module, consult manual/tutorial of module for details: http://search.cpan.org/~jhi/String-Approx-3.26/Approx.pm
+
+# Note that perl script, `Processing_paired_reads.pl`, was optimised to work specifically with paired-end reads with index barcode of 6 bases length positioned at the tag position of the read header, also this perl script can work on compressed (.gz) or uncompressed seqfile and performs adapter filtering, quality filtering and trimming
+
+# Create a new directory for deconvolution
+mkdir $HOME/scratch/ALV_MAC_RNAseq/fastq_sequence/
+cd $HOME/scratch/ALV_MAC_RNAseq/fastq_sequence/
+
+# Copy the required indices files and adapter filtering files into this directory
+for file in `ls /home/nnalpas/scratch/ALV_MAC_RNAseq/fastq_sequence/pool_*_indices.txt`; do cp $file ./`basename $file`; done;
+cp /home/nnalpas/scratch/ALV_MAC_RNAseq/fastq_sequence/Adapter_sequence.txt ./Adapter_sequence.txt
+
+# Create shell script to perform deconvolution of each pool fastq files
+for file in `find /workspace/storage/nnalpas/ALV_MAC_RNAseq/fastq_sequence/raw_reads/ -name *1.fq.gz`; do file2=`echo $file | perl -p -e 's/1(\.fq.gz)$/2$1/'`; pool=`echo $file | perl -p -e 's/^.*DM-pool-(.).*$/$1/'`; echo "perl /home/nnalpas/SVN/Processing_paired_reads.pl -seqfile1 $file -seqfile2 $file2 -indices $HOME/scratch/ALV_MAC_RNAseq/fastq_sequence/pool_${pool}_indices.txt -adapter_filt $HOME/scratch/ALV_MAC_RNAseq/fastq_sequence/Adapter_sequence.txt -amatch_param i_3_S3_D0_I0 -quality_filt 20 -quality_bases 25 -trim_mate1 5end_0_keep_90_3end_0 -trim_mate2 5end_0_keep_90_3end_0" >> deconv_filt_pool${pool}.sh; done;
+
+# Split and run all scripts on Stampede
+for script in `ls deconv_filt_*.sh`
+do
+chmod 755 $script
+nohup ./$script > ${script}.nohup &
+done
+
+# Check very carefully the different perl script outputs per pool_fastq_file to see if all reads have been processed; the .report file gives you all statistics you need in terms of number of reads per individual samples, tags occurence ...
+m [lane_fastq_file].report
+
+# Compile all deconvolution reports into a single file
+cd /workspace/scratch/dmagee/ALV_MAC_RNAseq/fastq_sequence/
+ls /workspace/scratch/dmagee/ALV_MAC_RNAseq/fastq_sequence/*_1_2_deconv.report > deconv_report.txt
+nohup perl /home/nnalpas/SVN/Compile_deconv_report.pl -list_reports deconv_report.txt -output all_deconv_report.txt
+
+# Move all excluded and filtered out read files into a directory
+mkdir /workspace/scratch/dmagee/ALV_MAC_RNAseq/fastq_sequence/Excluded
+cd /workspace/scratch/dmagee/ALV_MAC_RNAseq/fastq_sequence/
+for file in `ls *.excluded`; do mv ./$file ./Excluded/$file; done;
+
+
+##################################################
+# FastQC quality check of individual fastq files #
+##################################################
+
+# Required software is FastQC, consult manual/tutorial for details: http://www.bioinformatics.babraham.ac.uk/projects/fastqc/
+
+# Go to working directory
+cd $HOME/scratch/ALV_MAC_RNAseq/quality_check
+
+# Create shell script to perform FastQC quality check on individual samples fastq files
+for file in `ls $HOME/scratch/ALV_MAC_RNAseq/fastq_sequence/*.fastq`; do echo "fastqc --noextract --nogroup -t 1 -o $HOME/scratch/ALV_MAC_RNAseq/quality_check $file" >> fastqc_deconv_filt.sh; done;
+
+# Split and run all scripts on Stampede
+split -d -l 26 fastqc_deconv_filt.sh fastqc_deconv_filt.sh.
+for script in `ls fastqc_deconv_filt.sh.*`
+do
+chmod 755 $script
+nohup ./$script &
+done
+
+# Check all output from FastQC to determine best quality filtering strategy if required
+cd /home/dmagee/scratch/ALV_MAC_RNAseq/quality_check
+mkdir $HOME/scratch/ALV_MAC_RNAseq/quality_check/tmp
+for file in `ls *pe*_fastqc.zip`; do unzip $file -d $HOME/scratch/ALV_MAC_RNAseq/quality_check/tmp; done;
+for file in `find $HOME/scratch/ALV_MAC_RNAseq/quality_check/tmp -name summary.txt`; do m $file | grep "FAIL" >> fastqc_fail.txt; done;
+rm -rf $HOME/scratch/ALV_MAC_RNAseq/quality_check/tmp
+
+# Tidy up the quality_check directory
+mkdir $HOME/scratch/ALV_MAC_RNAseq/quality_check/pre_deconvolution
+for file in `ls Raw*_fastqc.zip`; do mv ./$file ./pre_deconvolution/$file; done;
+mv ./fastqc.sh ./pre_deconvolution/fastqc.sh
+mv ./fastqc_unfiltered_fail.txt ./post_deconvolution/fastqc_unfiltered_fail.txt
+mkdir $HOME/scratch/ALV_MAC_RNAseq/quality_check/post_deconvolution
+for file in `ls *pe*_fastqc.zip`; do mv ./$file ./post_deconvolution/$file; done;
+mv ./fastqc_deconv_filt.sh ./post_deconvolution/fastqc_deconv_filt.sh
+mv ./fastqc_fail.txt ./post_deconvolution/fastqc_fail.txt
+mkdir $HOME/scratch/ALV_MAC_RNAseq/quality_check/post_alignment
+
+
+#####################################################################################
+# STAR alignment of individual filtered samples against Bos taurus reference genome #
+#####################################################################################
+
+# Required software is STAR, consult manual/tutorial for details: http://code.google.com/p/rna-star/downloads/detail?name=STARmanual_2.3.0.1.pdf&can=2&q=
+
+# Create and enter alignment working directory
+mkdir $HOME/scratch/ALV_MAC_RNAseq/Alignment
+cd $HOME/scratch/ALV_MAC_RNAseq/Alignment
+
+# Create shell script to perform alignment of individual samples fastq files
+for file in `ls $HOME/scratch/ALV_MAC_RNAseq/fastq_sequence/*1.fastq`; do file2=`echo $file | perl -p -e 's/\_pe1\.fastq/\_pe2\.fastq/'`; sample=`basename $file | perl -p -e 's/_pe1.fastq//'`; echo "mkdir $HOME/scratch/ALV_MAC_RNAseq/Alignment/$sample; cd $HOME/scratch/ALV_MAC_RNAseq/Alignment/$sample; STAR --runMode alignReads --genomeDir /workspace/storage/genomes/bostaurus/UMD3.1.71/STAR2.3.0e/STAR2.3.0e_no_annotation/ --genomeLoad LoadAndRemove --readFilesIn $file $file2 --runThreadN 3 --outFilterMultimapNmax 10 --outSAMmode Full --outSAMattributes Standard --outFileNamePrefix ./${sample}_ --outReadsUnmapped Fastx" >> alignment.sh; done;
+
+# Split and run all scripts on Stampede
+split -d -l 26 alignment.sh alignment.sh.
+for script in `ls alignment.sh.*`
+do
+chmod 755 $script
+nohup ./$script &
+done
+
+# Compile all STAR log.final.out files from 127 individual samples into a single file
+for file in `find $HOME/scratch/ALV_MAC_RNAseq/Alignment/ -name *Log.final.out`; do perl /home/nnalpas/SVN/star_report_opener.pl -report $file; done;
+
+# Tidy up the Alignment directory to allow more alignment to be done
+mv $HOME/scratch/ALV_MAC_RNAseq/Alignment/ $HOME/scratch/ALV_MAC_RNAseq/Btaurus/
+mkdir $HOME/scratch/ALV_MAC_RNAseq/Alignment/
+mv $HOME/scratch/ALV_MAC_RNAseq/Btaurus/ $HOME/scratch/ALV_MAC_RNAseq/Alignment/Btaurus
+
+
+#############################################
+# FastQC quality check of aligned sam files #
+#############################################
+
+# Required software is FastQC, consult manual/tutorial for details: http://www.bioinformatics.babraham.ac.uk/projects/fastqc/
+
+# Go to working directory
+cd $HOME/scratch/ALV_MAC_RNAseq/quality_check/post_alignment
+
+# Create shell script to perform FastQC quality check on individual samples aligned sam files
+for file in `find $HOME/scratch/ALV_MAC_RNAseq/Alignment/Btaurus -name *.sam`; do echo "fastqc --noextract --nogroup -t 1 -o $HOME/scratch/ALV_MAC_RNAseq/quality_check/post_alignment $file" >> fastqc_aligned.sh; done;
+
+# Split and run all scripts on Stampede
+split -d -l 13 fastqc_aligned.sh fastqc_aligned.sh.
+for script in `ls fastqc_aligned.sh.*`
+do
+chmod 755 $script
+nohup ./$script &
+done
+
+# Check all output from FastQC particularly for the level of reads duplication
+cd /home/dmagee/scratch/ALV_MAC_RNAseq/quality_check/post_alignment
+mkdir /home/dmagee/scratch/ALV_MAC_RNAseq/quality_check/post_alignment/tmp
+for file in `ls *_fastqc.zip`; do unzip $file -d /home/dmagee/scratch/ALV_MAC_RNAseq/quality_check/post_alignment/tmp; done;
+for file in `find /home/dmagee/scratch/ALV_MAC_RNAseq/quality_check/post_alignment/tmp -name summary.txt`; do m $file | grep "FAIL" >> fastqc_aligned_fail.txt; done;
+rm -rf /home/dmagee/scratch/ALV_MAC_RNAseq/quality_check/post_alignment/tmp
+
+
+##############################################################################################
+# STAR alignment of individual filtered samples against Mycobacterium bovis reference genome #
+##############################################################################################
+
+# Use STAR aligner to align our fastq files; required software is STAR, consult manual for details: http://code.google.com/p/rna-star/
+
+# Download the Mycobacterium bovis reference genome from http://www.ncbi.nlm.nih.gov/nuccore/31791177?report=fasta and transfer it to your user account via WinSCP
+
+# Create working directory for genome indexing
+mkdir -p /workspace/storage/genomes/Mycobacterium_bovis/NC_002945.3/STAR2.3.0e
+mkdir -p /workspace/storage/genomes/Mycobacterium_bovis/NC_002945.3/source_file
+
+# Index the M. bovis reference genome with STAR
+cd /workspace/storage/genomes/Mycobacterium_bovis/NC_002945.3/STAR2.3.0e
+nohup STAR --runMode genomeGenerate --genomeDir /workspace/storage/genomes/Mycobacterium_bovis/NC_002945.3/STAR2.3.0e --genomeFastaFiles /workspace/storage/genomes/Mycobacterium_bovis/NC_002945.3/source_file/Mycobacterium_bovis_NC_002945.3.fasta --genomeSAindexNbases 7 --runThreadN 1 &
+
+# Create and enter working directory for alignment
+mkdir /home/dmagee/scratch/ALV_MAC_RNAseq/Alignment/Mbovis
+cd /home/dmagee/scratch/ALV_MAC_RNAseq/Alignment/Mbovis
+
+# Create shell script to perform alignment of individual samples fastq files against the M. bovis reference genome
+for file in `ls /home/dmagee/scratch/ALV_MAC_RNAseq/fastq_sequence/*1.fastq`; do file2=`echo $file | perl -p -e 's/\_pe1\.fastq/\_pe2\.fastq/'`; sample=`basename $file | perl -p -e 's/_pe1.fastq//'`; echo "mkdir /home/dmagee/scratch/ALV_MAC_RNAseq/Alignment/Mbovis/$sample; cd /home/dmagee/scratch/ALV_MAC_RNAseq/Alignment/Mbovis/$sample; STAR --runMode alignReads --genomeDir /workspace/storage/genomes/Mycobacterium_bovis/NC_002945.3/STAR2.3.0e --genomeLoad NoSharedMemory --readFilesIn $file $file2 --runThreadN 1 --outFilterMultimapNmax 10 --outSAMmode Full --outSAMattributes Standard --outFileNamePrefix ./${sample}_ --outReadsUnmapped Fastx" >> alignment_Mbovis.sh; done;
+
+# Split and run all scripts on Stampede
+split -d -l 26 alignment_Mbovis.sh alignment_Mbovis.sh.
+for script in `ls alignment_Mbovis.sh.*`
+do
+chmod 755 $script
+nohup ./$script &
+done
+
+# Compile all STAR log.final.out files from 127 individual samples into a single file
+for file in `find /home/dmagee/scratch/ALV_MAC_RNAseq/Alignment/Mbovis -name *Log.final.out`; do perl $HOME/SVN/star_report_opener.pl -report $file; done;
+
+# Delete all unaligned reads in files *_Unmapped.out.mate(1|2) since they are not needed
+for file in `find /workspace/scratch/dmagee/ALV_MAC_RNAseq/Alignment/Mbovis -name *_Unmapped.out.mate1`; do file2=`echo $file | perl -p -e 's/mate1/mate2/'`; rm -f $file $file2; done;
+
+
+#####################################################################################################
+# STAR alignment of individual filtered samples against Mycobacterium tuberculosis reference genome #
+#####################################################################################################
+
+# Use STAR aligner to align our fastq files; required software is STAR, consult manual for details: http://code.google.com/p/rna-star/
+
+# Download the Mycobacterium tuberculosis reference genome from http://www.ncbi.nlm.nih.gov/nuccore/NC_000962.3 and transfer it to your user account via WinSCP
+
+# Create working directory for genome indexing
+mkdir -p /workspace/storage/genomes/Mycobacterium_tuberculosis/NC_000962.3/STAR2.3.0e
+mkdir -p /workspace/storage/genomes/Mycobacterium_tuberculosis/NC_000962.3/source_file	# Directory which contains the fasta file
+
+# Index the M. tuberculosis reference genome with STAR
+cd /workspace/storage/genomes/Mycobacterium_tuberculosis/NC_000962.3/STAR2.3.0e
+nohup STAR --runMode genomeGenerate --genomeDir /workspace/storage/genomes/Mycobacterium_tuberculosis/NC_000962.3/STAR2.3.0e --genomeFastaFiles /workspace/storage/genomes/Mycobacterium_tuberculosis/NC_000962.3/source_file/Mycobacterium_tuberculosis_NC_000962.3.fasta --genomeSAindexNbases 7 --runThreadN 1 &
+
+# Create and enter working directory for alignment
+mkdir /home/dmagee/scratch/ALV_MAC_RNAseq/Alignment/Mtuberculosis
+cd /home/dmagee/scratch/ALV_MAC_RNAseq/Alignment/Mtuberculosis
+
+# Create shell script to perform alignment of individual samples fastq files against the M. bovis reference genome
+for file in `ls /home/dmagee/scratch/ALV_MAC_RNAseq/fastq_sequence/*1.fastq`; do file2=`echo $file | perl -p -e 's/\_pe1\.fastq/\_pe2\.fastq/'`; sample=`basename $file | perl -p -e 's/_pe1.fastq//'`; echo "mkdir /home/dmagee/scratch/ALV_MAC_RNAseq/Alignment/Mtuberculosis/$sample; cd /home/dmagee/scratch/ALV_MAC_RNAseq/Alignment/Mtuberculosis/$sample; STAR --runMode alignReads --genomeDir /workspace/storage/genomes/Mycobacterium_tuberculosis/NC_000962.3/STAR2.3.0e --genomeLoad NoSharedMemory --readFilesIn $file $file2 --runThreadN 1 --outFilterMultimapNmax 10 --outSAMmode Full --outSAMattributes Standard --outFileNamePrefix ./${sample}_ --outReadsUnmapped Fastx" >> alignment_Mtuberculosis.sh; done;
+
+# Split and run all scripts on Stampede
+split -d -l 26 alignment_Mtuberculosis.sh alignment_Mtuberculosis.sh.
+for script in `ls alignment_Mtuberculosis.sh.*`
+do
+chmod 755 $script
+nohup ./$script &
+done
+
+# Compile all STAR log.final.out files from 127 individual samples into a single file
+for file in `find /home/dmagee/scratch/ALV_MAC_RNAseq/Alignment/Mtuberculosis -name *Log.final.out`; do perl $HOME/SVN/star_report_opener.pl -report $file; done;
+
+# Delete all unaligned reads in files *_Unmapped.out.mate(1|2) since they are not needed
+for file in `find /workspace/scratch/dmagee/ALV_MAC_RNAseq/Alignment/Mtuberculosis -name *_Unmapped.out.mate1`; do file2=`echo $file | perl -p -e 's/mate1/mate2/'`; rm -f $file $file2; done;
+
+
+##################################################
+# Compress all fastq files of individual samples #
+##################################################
+
+# Go to working directory
+cd /workspace/scratch/dmagee/ALV_MAC_RNAseq/fastq_sequence
+
+# Compress all fastq files of individual samples
+for file in `ls *.fastq`; do excluded=`echo $file | perl -p -e 's/\.fastq/\.excluded/'`; echo "gzip -9 $file" >> compression.sh; echo "gzip -9 ./Excluded/$excluded" >> compression.sh; done;
+for file in `ls ./Excluded/Raw*.excluded`; do echo "gzip -9 $file" >> compression.sh; done;
+
+# Split and run all scripts on Stampede
+split -d -l 56 compression.sh compression.sh.
+for script in `ls compression.sh.*`
+do
+chmod 755 $script
+nohup ./$script > ${script}.nohup &
+done
+
+
+#####################################################################
+# Compress all unaligned reads in fastq files of individual samples #
+#####################################################################
+
+# Go to working directory
+cd /workspace/scratch/dmagee/ALV_MAC_RNAseq/Alignment/Btaurus
+
+# Compress all fastq files of individual samples
+for file in `find /workspace/scratch/dmagee/ALV_MAC_RNAseq/Alignment/Btaurus -name *_Unmapped.out.mate1`; do file2=`echo $file | perl -p -e 's/\.mate1/\.mate2/'`; echo "gzip -9 $file" >> unmapped_compression.sh; echo "gzip -9 $file2" >> unmapped_compression.sh; done;
+
+# Run script on Stampede
+chmod 755 unmapped_compression.sh
+nohup ./unmapped_compression.sh &
+
+
+#########################################################
+# Summarisation count with featureCounts for sense gene #
+#########################################################
+
+# Use featureCounts to perform count summarisation; required package is featureCounts which is part of subread software, consult manual for details: http://bioinf.wehi.edu.au/subread-package/SubreadUsersGuide.pdf
+
+# Create working directories
+mkdir -p $HOME/scratch/ALV_MAC_RNAseq/Count_summarisation/sense
+
+# Run featureCounts on SAM file containing multihits and uniquely mapped reads using stranded parameter
+cd $HOME/scratch/ALV_MAC_RNAseq/Count_summarisation/sense
+for file in `find $HOME/scratch/ALV_MAC_RNAseq/Alignment/Btaurus -name *_Aligned.out.sam`; do sample=`basename $file | perl -p -e 's/_Aligned.out.sam//'`; echo "mkdir $HOME/scratch/ALV_MAC_RNAseq/Count_summarisation/sense/$sample; cd $HOME/scratch/ALV_MAC_RNAseq/Count_summarisation/sense/$sample; featureCounts -a /workspace/storage/genomes/bostaurus/UMD3.1.71/annotation_file/Bos_taurus.UMD3.1.71.gtf -t exon -g gene_id -i $file -o $sample -s 1 -T 1 -R -p -B -C" >> sense_count.sh; done;
+
+# Split and run all scripts on Stampede
+split -d -l 26 sense_count.sh sense_count.sh.
+for script in `ls sense_count.sh.*`
+do
+chmod 755 $script
+nohup ./$script > ${script}.nohup &
+done
+
+# Summarise the annotation performed on each samples for stranded featureCounts run
+cd /workspace/scratch/dmagee/ALV_MAC_RNAseq/Count_summarisation/
+for file in `find /home/dmagee/scratch/ALV_MAC_RNAseq/Count_summarisation/sense/ -name N*H.reads`
+do
+echo echo "\`basename $file\` \`cut $file -f2 | sort | uniq -c | perl -p -e 's/\n/ /'\` >> annotation_summary_sense.txt" >> annotation_summary_sense.sh
+done
+
+# Run script on Stampede
+split -d -l 6 annotation_summary_sense.sh annotation_summary_sense.sh.
+for script in `ls annotation_summary_sense.sh.*`
+do
+chmod 755 $script
+nohup ./$script &
+done
+
+# Create working directory
+mkdir -p $HOME/scratch/ALV_MAC_RNAseq/edgeR/sense
+
+# Copy gene count files into working directory
+for file in `find /home/dmagee/scratch/ALV_MAC_RNAseq/Count_summarisation/sense -name N*H.reads`; do file2=`basename $file | perl -p -e 's/.reads//'`; cp /home/dmagee/scratch/ALV_MAC_RNAseq/Count_summarisation/sense/$file2/$file2 $HOME/scratch/ALV_MAC_RNAseq/edgeR/sense/$file2; done;
+
+# Perform subsequent sense genes analyses in R, follow pipeline: `Alv_mac_edgeR_paired_sense_pipeline.R`
+
+
+#################################################################
+# Create a annotation file of novel transcripts using Cufflinks #
+#################################################################
+
+# Note that perl script, `sam_file_edit_cufflinks.pl`, was optimised to work specifically with aligned paired-end reads, also this perl script works only on SAM files from the experiment ALV_MAC_RNAseq
+
+# Create a working directory and enter this directory
+mkdir /home/dmagee/scratch/ALV_MAC_RNAseq/Novel_transcripts
+cd /home/dmagee/scratch/ALV_MAC_RNAseq/Novel_transcripts
+
+# Annotate SAM file by adding strand information so that file is compatible with cufflinks
+for file in `find /home/dmagee/scratch/ALV_MAC_RNAseq/Alignment/Btaurus/ -name *_Aligned.out.sam`; do sample=`basename $file | perl -p -e 's/_Aligned.out.sam/_novel/'`; echo "perl /home/nnalpas/SVN/sam_file_edit_cufflinks.pl -sam $file; samtools view -bhS ${sample}.sam | samtools sort - ${sample}" >> sam_reformat_to_cuff.sh; done;
+
+# Run all scripts on Stampede
+split -d -l 11 sam_reformat_to_cuff.sh sam_reformat_to_cuff.sh.
+for script in `ls sam_reformat_to_cuff.sh.*`
+do
+chmod 755 $script
+nohup ./$script > ${script}_nohup &
+done
+
+# Remove all SAM files but keep all BAM files
+rm -f /home/dmagee/scratch/ALV_MAC_RNAseq/Novel_transcripts/*_novel.sam
+
+# Prepare shell script to perform cufflinks
+for file in `ls /home/dmagee/scratch/ALV_MAC_RNAseq/Novel_transcripts/*.bam`; do sample=`basename $file | perl -p -e 's/_novel\.bam//'`; echo "cufflinks -o /home/dmagee/scratch/ALV_MAC_RNAseq/Novel_transcripts/$sample -p 1 -g /workspace/storage/genomes/bostaurus/UMD3.1.71/annotation_file/Bos_taurus.UMD3.1.71.gtf -b /workspace/storage/genomes/bostaurus/UMD3.1.71/source_file/Bos_taurus.UMD3.1.71.dna.toplevel.fa -u --library-type fr-secondstrand --no-length-correction $file" >> cufflink.sh; done;
+
+# Run all scripts on Stampede
+split -d -l 13 cufflink.sh cufflink.sh.
+for script in `ls cufflink.sh.*`
+do
+chmod 755 $script
+nohup ./$script > ${script}_nohup &
+done
+
+# Create and go to working directory
+mkdir /workspace/scratch/dmagee/ALV_MAC_RNAseq/Novel_transcripts/Merge
+cd /workspace/scratch/dmagee/ALV_MAC_RNAseq/Novel_transcripts/Merge
+
+# Create file containing the list of transcript assemblies
+find /workspace/scratch/dmagee/ALV_MAC_RNAseq/Novel_transcripts/ -name transcripts.gtf >> assembly_GTF_list.txt
+
+# Prepare shell script to merge all transcript assemblies generated (this will also run cuffcompare)
+echo "cuffmerge -p 10 -g /workspace/storage/genomes/bostaurus/UMD3.1.71/annotation_file/Bos_taurus.UMD3.1.71.gtf /workspace/scratch/dmagee/ALV_MAC_RNAseq/Novel_transcripts/Merge/assembly_GTF_list.txt" >> cuffmerge.sh
+
+# Run script on Stampede
+chmod 755 cuffmerge.sh
+nohup ./cuffmerge.sh &
+
+# Once satisfied with the cufflink annotation remove all BAM files which have been generated for Cufflinks (the original SAM files are still kept)
+rm -f /home/dmagee/scratch/ALV_MAC_RNAseq/Novel_transcripts/*_novel.bam
+
+# Move all Cufflinks results into a new folder, to be compressed
+mkdir /home/dmagee/scratch/ALV_MAC_RNAseq/Novel_transcripts/Cufflinks
+cd /home/dmagee/scratch/ALV_MAC_RNAseq/Novel_transcripts
+for folder in `ls -d N*H`; do mv /home/dmagee/scratch/ALV_MAC_RNAseq/Novel_transcripts/$folder /home/dmagee/scratch/ALV_MAC_RNAseq/Novel_transcripts/Cufflinks/$folder; done;
+nohup tar -cvzf Cufflinks.tar.gz /home/dmagee/scratch/ALV_MAC_RNAseq/Novel_transcripts/Cufflinks &
+rm -rf /home/dmagee/scratch/ALV_MAC_RNAseq/Novel_transcripts/Cufflinks
+
+
+#######################################################
+# Edit the new annotation file generated by Cufflinks #
+#######################################################
+
+# Note that perl script, `Grep_file2_based_on_file1.pl`, was optimised to work either to find transcript ID in a gtf file (and outputting all associated annotation lines) or to find protein ID in a fasta file (and outputting all associated sequence lines); this perl script was optimised using ALV_MAC_RNAseq project
+
+# Go to working directory
+cd /workspace/scratch/dmagee/ALV_MAC_RNAseq/Novel_transcripts/Merge/merged_asm
+
+# Summarise quickly the new annotation file
+echo "# Number of transcripts:" > summary_new_annotation.txt
+m merged.gtf | grep -P -o "exon_number \"1\".*class_code \".\"" | grep -P -o "class_code \".\"" | sort | uniq -c >> summary_new_annotation.txt
+
+# Obtain the list of novel transcripts ID (and also natural antisense transcripts ID, even if they probably will not be used)
+m merged.gtf | grep -P "class_code \"u\"" | grep -Po "transcript_id \"TCONS_\d*\"" | grep -Po "TCONS_\d*" | sort | uniq >> Novel_id.txt
+m merged.gtf | grep -P "class_code \"x\"" | grep -Po "transcript_id \"TCONS_\d*\"" | grep -Po "TCONS_\d*" | sort | uniq >> NAT_id.txt
+
+# Obtain the annotation for the novel transcripts (and also the NAT)
+nohup perl /home/nnalpas/SVN/Grep_file2_based_on_file1.pl -file1 Novel_id.txt -file2 merged.gtf -output Bos_taurus.novel.gtf &
+nohup perl /home/nnalpas/SVN/Grep_file2_based_on_file1.pl -file1 NAT_id.txt -file2 merged.gtf -output Bos_taurus.nat.gtf &
+
+# Edit the gtf annotation files for the novel features (and also the NAT)
+perl /home/nnalpas/SVN/gtf_file_edit.pl -newgtf Bos_taurus.novel.gtf -type novel
+perl /home/nnalpas/SVN/gtf_file_edit.pl -newgtf Bos_taurus.nat.gtf -type nat -refgtf /workspace/storage/genomes/bostaurus/UMD3.1.71/annotation_file/Bos_taurus.UMD3.1.71.gtf
+
+
+########################################################
+# Extract transcript sequences using Cufflinks utility #
+########################################################
+
+# Create and go to working directory
+mkdir -p /workspace/scratch/dmagee/ALV_MAC_RNAseq/Blast_novel/Sequence
+cd /workspace/scratch/dmagee/ALV_MAC_RNAseq/Blast_novel/Sequence
+
+# Copy the novel gtf file into the working directory (and also the NAT)
+cp /workspace/scratch/dmagee/ALV_MAC_RNAseq/Novel_transcripts/Merge/merged_asm/Bos_taurus.novel_edited.gtf /workspace/scratch/dmagee/ALV_MAC_RNAseq/Blast_novel/Sequence/Bos_taurus.novel_30082013.gtf
+cp /workspace/scratch/dmagee/ALV_MAC_RNAseq/Novel_transcripts/Merge/merged_asm/Bos_taurus.nat_edited.gtf /workspace/scratch/dmagee/ALV_MAC_RNAseq/Blast_novel/Sequence/Bos_taurus.nat_30082013.gtf
+
+# Use Cufflinks utility to extract the novel transcript sequence based on annotation gtf (and also the NAT)
+echo "gffread -M -w /workspace/scratch/dmagee/ALV_MAC_RNAseq/Blast_novel/Sequence/Bos_taurus.novel.fa -g /workspace/storage/genomes/bostaurus/UMD3.1.71/source_file/Bos_taurus.UMD3.1.71.dna.toplevel.fa /workspace/scratch/dmagee/ALV_MAC_RNAseq/Blast_novel/Sequence/Bos_taurus.novel_30082013.gtf" >> novel_sequence.sh
+echo "gffread -M -w /workspace/scratch/dmagee/ALV_MAC_RNAseq/Blast_novel/Sequence/Bos_taurus.nat.fa -g /workspace/storage/genomes/bostaurus/UMD3.1.71/source_file/Bos_taurus.UMD3.1.71.dna.toplevel.fa /workspace/scratch/dmagee/ALV_MAC_RNAseq/Blast_novel/Sequence/Bos_taurus.nat_30082013.gtf" >> nat_sequence.sh
+
+# Modify the Bos_taurus.novel_30082013.gtf annotation gtf file so that transcript length match the genome sequence length (look at the nohup for modification to make) and rerun the script until there is no more error in the nohup
+
+# Run script on Stampede
+for script in `ls *sequence.sh`
+do
+chmod 755 $script
+nohup ./$script > ${script}_nohup &
+done
+
+
+####################################################################################################
+# Blasting of Bos taurus novel transcripts sequence against Homo sapiens protein sequence database #
+####################################################################################################
+
+# Requirements are NCBI Blast and Homo sapiens protein sequence from Ensembl release 73 in fasta format: consult ftp://ftp.ensembl.org/pub/release-73/fasta/homo_sapiens/pep/Homo_sapiens.GRCh37.73.pep.all.fa.gz
+
+# Use NCBI BLAST 2.2.28+ installed on Stampede to blast all novel transripts sequence and get potential description for novel transcripts by orthology with homo sapiens Ensembl protein database
+
+# Note that perl script, `Fasta_parsing_seq.pl`, was optimised to work specifically with sequence fasta file for parsing into smaller fasta files (based on the header line ID)
+
+# Split the fasta files for NAT and novel transcripts into smaller fasta to allow faster processing on NCBI BLAST
+cd /workspace/scratch/dmagee/ALV_MAC_RNAseq/Blast_novel/Sequence
+perl /home/nnalpas/SVN/Fasta_parsing_seq.pl -fasta Bos_taurus.novel.fa -parsing 1770
+
+# Download and uncompress the Homo sapiens protein sequence from Ensembl release 73
+mkdir -p /workspace/storage/genomes/homosapiens/ensembl_73/protein_fasta
+cd /workspace/storage/genomes/homosapiens/ensembl_73/protein_fasta
+nohup wget -v ftp://ftp.ensembl.org/pub/release-73/fasta/homo_sapiens/pep/Homo_sapiens.GRCh37.73.pep.all.fa.gz &
+gunzip Homo_sapiens.GRCh37.73.pep.all.fa.gz
+
+# Use the Homo sapiens protein sequence to create a database for Blast
+cp /workspace/storage/genomes/homosapiens/ensembl_73/protein_fasta/Homo_sapiens.GRCh37.73.pep.all.fa /home/nnalpas/Software/blast_db/Hsapiens73.fa
+cd /home/nnalpas/Software/blast_db
+nohup makeblastdb -dbtype 'prot' -in Hsapiens73.fa -input_type 'fasta' -title Hsapiens73 -taxid 9606 -out Hsapiens73 &
+
+# Create and enter working directory
+mkdir /workspace/scratch/dmagee/ALV_MAC_RNAseq/Blast_novel/blastx
+cd /workspace/scratch/dmagee/ALV_MAC_RNAseq/Blast_novel/blastx
+
+# Prepare a shell script to run blastx on the novel transcripts sequence against the Homo sapiens Ensembl protein database
+for file in `ls /workspace/scratch/dmagee/ALV_MAC_RNAseq/Blast_novel/Sequence/Bos_taurus.no*_*.fa`; do outfile=`basename $file`; echo "blastx -query $file -db Hsapiens73 -out ${outfile}.blastx -evalue 1 -outfmt 10 -num_alignments 10 -export_search_strategy search_startegy.blastx -num_threads 1" >> blastx.sh; done;
+
+# Run all scripts on Stampede
+split -d -l 1 blastx.sh blastx.sh.
+for file in `ls blastx.sh.*`
+do
+chmod 755 $file
+nohup ./$file > ${file}.nohup &
+done
+
+# Concatenate all the blastx report for the different jobs into a single file
+cat Bos_taurus.novel_1.fa.blastx Bos_taurus.novel_2.fa.blastx Bos_taurus.novel_3.fa.blastx Bos_taurus.novel_4.fa.blastx Bos_taurus.novel_5.fa.blastx Bos_taurus.novel_6.fa.blastx Bos_taurus.novel_7.fa.blastx >> Bos_taurus.novel.blastx
+
+# Remove all splitted smaller blastx files but keep the concatenated file once all jobs are finished
+rm ./Bos_taurus.novel_*.fa.blastx
+
+
+#############################################################################################
+# Blasting of best Homo sapiens protein hit against Bos taurus nucleotide sequence database #
+#############################################################################################
+
+# Requirements are Homo sapiens annotation from Ensembl release 73 in gtf format: consult ftp://ftp.ensembl.org/pub/release-73/gtf/homo_sapiens/Homo_sapiens.GRCh37.73.gtf.gz
+
+# Note that perl script, `Best_blastx_hit.pl`, was optimised to select best hit from a blastx run
+# Note that perl script, `Grep_file2_based_on_file1.pl`, was optimised to work either to find transcript ID in a gtf file (and outputting all associated annotation lines) or to find protein ID in a fasta file (and outputting all associated sequence lines); this perl script was optimised using ALV_MAC_RNAseq project
+# Note that perl script, `Fasta_parsing_seq.pl`, was optimised to work specifically with sequence fasta file for parsing into smaller fasta files (based on the header line ID)
+
+# Use Cufflinks utility to extract the Bos taurus reference transcript sequence based on annotation gtf
+cd /workspace/scratch/dmagee/ALV_MAC_RNAseq/Blast_novel/Sequence
+echo "gffread -M -w /workspace/scratch/dmagee/ALV_MAC_RNAseq/Blast_novel/Sequence/Bos_taurus.UMD3.1.71.fa -g /workspace/storage/genomes/bostaurus/UMD3.1.71/source_file/Bos_taurus.UMD3.1.71.dna.toplevel.fa /workspace/storage/genomes/bostaurus/UMD3.1.71/annotation_file/Bos_taurus.UMD3.1.71.gtf" >> reference_sequence.sh
+
+# Run script on Stampede
+chmod 755 reference_sequence.sh
+nohup ./reference_sequence.sh > reference_sequence.sh_nohup &
+
+# Concatenate the reference transcript sequence from Bos taurus UMD3.1.71 with the novel transcript sequence into a single fasta file
+cat Bos_taurus.UMD3.1.71.fa Bos_taurus.novel.fa >> Bos_taurus.19092013.fa
+
+# Use the Bos taurus transcript sequence (containing reference and novel) to create a database for Blast
+cp /workspace/scratch/dmagee/ALV_MAC_RNAseq/Blast_novel/Sequence/Bos_taurus.19092013.fa /home/nnalpas/Software/blast_db/Bos_taurus.19092013.fa
+cd /home/nnalpas/Software/blast_db
+nohup makeblastdb -dbtype 'nucl' -in Bos_taurus.19092013.fa -input_type 'fasta' -title Bos_taurus.19092013 -taxid 9913 -out Bos_taurus.19092013 &
+
+# Download and uncompress the Homo sapiens gtf annotation file from Ensembl release 73
+mkdir -p /workspace/storage/genomes/homosapiens/ensembl_73/annotation_file
+cd /workspace/storage/genomes/homosapiens/ensembl_73/annotation_file
+nohup wget -v ftp://ftp.ensembl.org/pub/release-73/gtf/homo_sapiens/Homo_sapiens.GRCh37.73.gtf.gz &
+gunzip Homo_sapiens.GRCh37.73.gtf.gz
+
+# Select the best Homo sapiens protein hit for each blastx query run
+cp -r /workspace/scratch/dmagee/ALV_MAC_RNAseq/Blast_novel/blastx /workspace/scratch/dmagee/ALV_MAC_RNAseq/Blast_novel/blastx_181113
+cd /workspace/scratch/dmagee/ALV_MAC_RNAseq/Blast_novel/blastx_181113
+nohup perl $HOME/SVN/Best_blastx_hit.pl -blast Bos_taurus.novel.blastx -homo_gtf /workspace/storage/genomes/homosapiens/ensembl_73/annotation_file/Homo_sapiens.GRCh37.73.gtf &
+
+# Grep the human protein sequence for each best hit and split the file in several subfiles to allow faster processing on NCBI BLAST
+cp -r /workspace/scratch/dmagee/ALV_MAC_RNAseq/Blast_novel/Sequence /workspace/scratch/dmagee/ALV_MAC_RNAseq/Blast_novel/Sequence_181113
+cd /workspace/scratch/dmagee/ALV_MAC_RNAseq/Blast_novel/Sequence_181113
+perl $HOME/SVN/Grep_file2_based_on_file1.pl -file1 /workspace/scratch/dmagee/ALV_MAC_RNAseq/Blast_novel/blastx_181113/Bos_taurus.novel_hitid.txt -file2 /workspace/storage/genomes/homosapiens/ensembl_73/protein_fasta/Homo_sapiens.GRCh37.73.pep.all.fa -output H_sapiens_protein_hit.fa
+perl $HOME/SVN/Fasta_parsing_seq.pl -fasta H_sapiens_protein_hit.fa -parsing 202
+
+# Create and enter working directory
+mkdir /workspace/scratch/dmagee/ALV_MAC_RNAseq/Blast_novel/tblastn_181113
+cd /workspace/scratch/dmagee/ALV_MAC_RNAseq/Blast_novel/tblastn_181113
+
+# Prepare a shell script to run tblastn on the Homo sapiens protein sequence (best hit) against the Bos taurus transcript sequence database
+for file in `ls /workspace/scratch/dmagee/ALV_MAC_RNAseq/Blast_novel/Sequence_181113/H_sapiens_protein_hit_*.fa`; do outfile=`basename $file`; echo "tblastn -query $file -db Bos_taurus.19092013 -out ${outfile}.tblastn -evalue 1 -outfmt 10 -num_alignments 10 -export_search_strategy search_startegy.tblastn -num_threads 1" >> tblastn.sh; done;
+
+# Run all scripts on Stampede
+split -d -l 1 tblastn.sh tblastn.sh.
+for file in `ls tblastn.sh.*`
+do
+chmod 755 $file
+nohup ./$file > ${file}.nohup &
+done
+
+# Concatenate all the tblastn report for the different jobs into a single file
+cat H_sapiens_protein_hit_1.fa.tblastn H_sapiens_protein_hit_2.fa.tblastn H_sapiens_protein_hit_3.fa.tblastn H_sapiens_protein_hit_4.fa.tblastn H_sapiens_protein_hit_5.fa.tblastn H_sapiens_protein_hit_6.fa.tblastn H_sapiens_protein_hit_7.fa.tblastn H_sapiens_protein_hit_8.fa.tblastn H_sapiens_protein_hit_9.fa.tblastn H_sapiens_protein_hit_10.fa.tblastn >> H_sapiens_protein_hit.tblastn
+
+# Remove all splitted smaller tblastn files and protein sequence fasta files but keep the concatenated file once all jobs are finished
+rm ./H_sapiens_protein_hit_*.fa.tblastn
+rm -f /workspace/scratch/dmagee/ALV_MAC_RNAseq/Blast_novel/Sequence_181113/H_sapiens_protein_hit_*.fa
+
+
+#########################################################################
+# Novel transcripts annotation by orthology: Reciprocal Best Hit method #
+#########################################################################
+
+# Requirements are Perl and Bos taurus gene annotation from Ensembl release 71 in gtf format: consult ftp://ftp.ensembl.org/pub/release-71/gtf/bos_taurus/Bos_taurus.UMD3.1.71.gtf.gz
+# Requirements are Homo sapiens annotation from Ensembl release 73 in gtf format: consult ftp://ftp.ensembl.org/pub/release-73/gtf/homo_sapiens/Homo_sapiens.GRCh37.73.gtf.gz
+
+# Note that perl script, `Best_tblastn_hit.pl`, was optimised to select best hit from a tblastn run as well as the Reciprocal Best Hit per novel gene
+
+# Select the best Bos taurus gene hit for each tblastn query run and the Reciprocal Best Hit
+cd /workspace/scratch/dmagee/ALV_MAC_RNAseq/Blast_novel/tblastn_181113
+nohup perl $HOME/SVN/Best_tblastn_hit.pl -blast H_sapiens_protein_hit.tblastn -homo_gtf /workspace/storage/genomes/homosapiens/ensembl_73/annotation_file/Homo_sapiens.GRCh37.73.gtf -bos_gtf /workspace/scratch/dmagee/ALV_MAC_RNAseq/Gene_annotation/Bos_taurus.UMD3.1.71_sense_and_novel_111113.gtf -rbh RBH_181113.txt &
+
+
+######################################
+# Bos taurus gene annotation editing #
+######################################
+
+# Requirements are Perl and Bos taurus gene annotation in gtf format: consult ftp://ftp.ensembl.org/pub/release-71/gtf/bos_taurus/Bos_taurus.UMD3.1.71.gtf.gz
+
+# Note that perl script, `Gtf_gene_info_addition.pl`, was optimised to work specifically with paired-end reads to collect each gene information from gtf annotation file such as start_position, end_position, strand, chromosome_name and transcript_id, as well as antisense gene annotation
+
+# Concatenate and sort the reference Bos taurus annotation file with the Bos taurus novel gene annotation
+cat /workspace/storage/genomes/bostaurus/UMD3.1.71/annotation_file/Bos_taurus.UMD3.1.71.gtf /workspace/scratch/dmagee/ALV_MAC_RNAseq/Blast_novel/Sequence/Bos_taurus.novel_30082013.gtf > Bos_taurus.UMD3.1.71_with_novel.gtf
+
+# Create and enter working directory
+mkdir /workspace/scratch/dmagee/ALV_MAC_RNAseq/Gene_annotation
+cd /workspace/scratch/dmagee/ALV_MAC_RNAseq/Gene_annotation
+
+# Run the perl script to generate the edited gtf annotation files
+nohup perl $HOME/SVN/Gtf_gene_info_addition.pl -gtf Bos_taurus.UMD3.1.71_with_novel.gtf -chrom_length chrom_length.txt -sense Bos_taurus.UMD3.1.71_sense_251113.gtf -antisense_gtf Bos_taurus.UMD3.1.71_antisense_251113.gtf -novel_gtf Bos_taurus.UMD3.1.71_novel_251113.gtf -all_gtf Bos_taurus.UMD3.1.71_sense_and_novel_251113.gtf -gene_info gene_info_251113.txt &
+
+
+###############################################################
+# Select unassigned reads post sense gene count summarisation #
+###############################################################
+
+# Note that perl script, `sam_unassigned.pl`, was optimised to select all Unassigned_No_Features reads from SAM files
+
+# Create a working directory and enter this directory
+mkdir /home/dmagee/scratch/ALV_MAC_RNAseq/Annotated_BAM
+cd /home/dmagee/scratch/ALV_MAC_RNAseq/Annotated_BAM
+
+# Create shell script to select only the unassigned reads post featureCounts of sense reads
+for file in `ls -d /home/dmagee/scratch/ALV_MAC_RNAseq/Alignment/Btaurus/*CN*H`; do sample=`echo $file | perl -p -e 's/^.*(N.*CN.*H)/$1/'`; echo "perl /home/nnalpas/SVN/sam_unassigned.pl -sam /home/dmagee/scratch/ALV_MAC_RNAseq/Alignment/Btaurus/$sample/${sample}_Aligned.out.sam -featurecount /workspace/scratch/dmagee/ALV_MAC_RNAseq/Count_summarisation/sense/$sample/${sample}.reads -custom sense" >> unassigned_sense.sh; done;
+for file in `ls -d /home/dmagee/scratch/ALV_MAC_RNAseq/Alignment/Btaurus/*MB*H`; do sample=`echo $file | perl -p -e 's/^.*(N.*MB.*H)/$1/'`; echo "perl /home/nnalpas/SVN/sam_unassigned.pl -sam /home/dmagee/scratch/ALV_MAC_RNAseq/Alignment/Btaurus/$sample/${sample}_Aligned.out.sam -featurecount /workspace/scratch/dmagee/ALV_MAC_RNAseq/Count_summarisation/sense/$sample/${sample}.reads -custom sense" >> unassigned_sense.sh; done;
+for file in `ls -d /home/dmagee/scratch/ALV_MAC_RNAseq/Alignment/Btaurus/*TB*H`; do sample=`echo $file | perl -p -e 's/^.*(N.*TB.*H)/$1/'`; echo "perl /home/nnalpas/SVN/sam_unassigned.pl -sam /home/dmagee/scratch/ALV_MAC_RNAseq/Alignment/Btaurus/$sample/${sample}_Aligned.out.sam -featurecount /workspace/scratch/dmagee/ALV_MAC_RNAseq/Count_summarisation/sense/$sample/${sample}.reads -custom sense" >> unassigned_sense.sh; done;
+
+# Split and run all scripts on Stampede
+split -d -l 4 unassigned_sense.sh unassigned_sense.sh.
+for script in `ls unassigned_sense.sh.*`
+do
+chmod 755 $script
+nohup ./$script &
+done
+
+
+#############################################################
+# Summarisation count with featureCounts for antisense gene #
+#############################################################
+
+# Use featureCounts to perform count summarisation; required package is featureCounts which is part of subread software, consult manual for details: http://bioinf.wehi.edu.au/subread-package/SubreadUsersGuide.pdf
+
+# Create working directories
+mkdir -p /home/dmagee/scratch/ALV_MAC_RNAseq/Count_summarisation/antisense
+
+# Run featureCounts on SAM file containing multihits and uniquely mapped reads using stranded parameter
+cd /home/dmagee/scratch/ALV_MAC_RNAseq/Count_summarisation/antisense
+for file in `ls /home/dmagee/scratch/ALV_MAC_RNAseq/Annotated_BAM/*H_sense_unassigned.sam`; do sample=`basename $file | perl -p -e 's/_sense_unassigned.sam//'`; echo "mkdir /home/dmagee/scratch/ALV_MAC_RNAseq/Count_summarisation/antisense/$sample; cd /home/dmagee/scratch/ALV_MAC_RNAseq/Count_summarisation/antisense/$sample; featureCounts -a /home/dmagee/scratch/ALV_MAC_RNAseq/Gene_annotation/Bos_taurus.UMD3.1.71_antisense_251113.gtf -t gene -g gene_id -i $file -o $sample -s 1 -T 1 -R -p -B -C" >> antisense_count.sh; done;
+
+# Split and run all scripts on Stampede
+split -d -l 9 antisense_count.sh antisense_count.sh.
+for script in `ls antisense_count.sh.*`
+do
+chmod 755 $script
+nohup ./$script > ${script}.nohup &
+done
+
+# Summarise the annotation performed on each samples for stranded featureCounts run
+cd /workspace/scratch/dmagee/ALV_MAC_RNAseq/Count_summarisation/
+for file in `find /home/dmagee/scratch/ALV_MAC_RNAseq/Count_summarisation/antisense/ -name N*H.reads`
+do
+echo echo "\`basename $file\` \`cut $file -f2 | sort | uniq -c | perl -p -e 's/\n/ /'\` >> annotation_summary_antisense.txt" >> annotation_summary_antisense.sh
+done
+
+# Run script on Stampede
+split -d -l 6 annotation_summary_antisense.sh annotation_summary_antisense.sh.
+for script in `ls annotation_summary_antisense.sh.*`
+do
+chmod 755 $script
+nohup ./$script &
+done
+
+# Create working directory
+mkdir -p $HOME/scratch/ALV_MAC_RNAseq/edgeR/antisense
+
+# Copy gene count files into working directory
+for file in `find /home/dmagee/scratch/ALV_MAC_RNAseq/Count_summarisation/antisense -name N*H.reads`; do file2=`basename $file | perl -p -e 's/.reads//'`; cp /home/dmagee/scratch/ALV_MAC_RNAseq/Count_summarisation/antisense/$file2/$file2 $HOME/scratch/ALV_MAC_RNAseq/edgeR/antisense/$file2; done;
+
+# Perform subsequent antisense genes (NAT) analyses in R, follow pipeline: `Alv_mac_edgeR_paired_antisense_pipeline.R`
+
+
+###########################################################################################################################
+# Summarisation count with featureCounts for sense reads to perform ratio of Antisense/Sense counts over full gene length #
+###########################################################################################################################
+
+# Use featureCounts to perform count summarisation; required package is featureCounts which is part of subread software, consult manual for details: http://bioinf.wehi.edu.au/subread-package/SubreadUsersGuide.pdf
+
+# Create working directories
+mkdir -p /home/dmagee/scratch/ALV_MAC_RNAseq/Count_summarisation/ratio_sense
+
+# Run featureCounts on SAM file containing multihits and uniquely mapped reads using stranded parameter
+cd /home/dmagee/scratch/ALV_MAC_RNAseq/Count_summarisation/ratio_sense
+for file in `ls /home/dmagee/scratch/ALV_MAC_RNAseq/Annotated_BAM/*MB_*H.sam`; do sample=`basename $file | perl -p -e 's/.sam//'`; echo "mkdir /home/dmagee/scratch/ALV_MAC_RNAseq/Count_summarisation/ratio_sense/$sample; cd /home/dmagee/scratch/ALV_MAC_RNAseq/Count_summarisation/ratio_sense/$sample; featureCounts -a /home/dmagee/scratch/ALV_MAC_RNAseq/Gene_annotation/Bos_taurus.UMD3.1.71_antisense_251113.gtf -t gene -g gene_id -i $file -o $sample -s 2 -T 1 -R -p -B -C" >> ratio_sense_count.sh; done;
+for file in `ls /home/dmagee/scratch/ALV_MAC_RNAseq/Annotated_BAM/*CN_*H.sam`; do sample=`basename $file | perl -p -e 's/.sam//'`; echo "mkdir /home/dmagee/scratch/ALV_MAC_RNAseq/Count_summarisation/ratio_sense/$sample; cd /home/dmagee/scratch/ALV_MAC_RNAseq/Count_summarisation/ratio_sense/$sample; featureCounts -a /home/dmagee/scratch/ALV_MAC_RNAseq/Gene_annotation/Bos_taurus.UMD3.1.71_antisense_251113.gtf -t gene -g gene_id -i $file -o $sample -s 2 -T 1 -R -p -B -C" >> ratio_sense_count.sh; done;
+
+# Split and run all scripts on Stampede
+split -d -l 18 ratio_sense_count.sh ratio_sense_count.sh.
+for script in `ls ratio_sense_count.sh.*`
+do
+chmod 755 $script
+nohup ./$script > ${script}.nohup &
+done
+
+# Create working directory
+mkdir -p $HOME/scratch/ALV_MAC_RNAseq/edgeR/ratio_sense
+
+# Copy gene count files into working directory
+for file in `find /home/dmagee/scratch/ALV_MAC_RNAseq/Count_summarisation/ratio_sense -name N*H.reads`; do file2=`basename $file | perl -p -e 's/.reads//'`; cp /home/dmagee/scratch/ALV_MAC_RNAseq/Count_summarisation/ratio_sense/$file2/$file2 $HOME/scratch/ALV_MAC_RNAseq/edgeR/ratio_sense/$file2; done;
+
+# Perform subsequent ratio of antisense-sense genes analyses in R, follow pipeline: `Alv_mac_edgeR_paired_antisense_pipeline.R`
+
+
+########################################################################################################################
+# Summarisation count with featureCounts for antisense reads to perform ratio of Antisense/Sense counts over exon only #
+########################################################################################################################
+
+# Use featureCounts to perform count summarisation; required package is featureCounts which is part of subread software, consult manual for details: http://bioinf.wehi.edu.au/subread-package/SubreadUsersGuide.pdf
+
+# Create working directories
+mkdir -p /home/dmagee/scratch/ALV_MAC_RNAseq/Count_summarisation/ratio_antisense
+
+# Run featureCounts on SAM file containing multihits and uniquely mapped reads using stranded parameter
+cd /home/dmagee/scratch/ALV_MAC_RNAseq/Count_summarisation/ratio_antisense
+for file in `ls /home/dmagee/scratch/ALV_MAC_RNAseq/Annotated_BAM/*MB_*H.sam`; do sample=`basename $file | perl -p -e 's/.sam//'`; echo "mkdir /home/dmagee/scratch/ALV_MAC_RNAseq/Count_summarisation/ratio_antisense/$sample; cd /home/dmagee/scratch/ALV_MAC_RNAseq/Count_summarisation/ratio_antisense/$sample; featureCounts -a /workspace/storage/genomes/bostaurus/UMD3.1.71/annotation_file/Bos_taurus.UMD3.1.71.gtf -t exon -g gene_id -i $file -o $sample -s 2 -T 1 -R -p -B -C" >> ratio_antisense_count.sh; done;
+for file in `ls /home/dmagee/scratch/ALV_MAC_RNAseq/Annotated_BAM/*CN_*H.sam`; do sample=`basename $file | perl -p -e 's/.sam//'`; echo "mkdir /home/dmagee/scratch/ALV_MAC_RNAseq/Count_summarisation/ratio_antisense/$sample; cd /home/dmagee/scratch/ALV_MAC_RNAseq/Count_summarisation/ratio_antisense/$sample; featureCounts -a /workspace/storage/genomes/bostaurus/UMD3.1.71/annotation_file/Bos_taurus.UMD3.1.71.gtf -t exon -g gene_id -i $file -o $sample -s 2 -T 1 -R -p -B -C" >> ratio_antisense_count.sh; done;
+
+# Split and run all scripts on Stampede
+split -d -l 18 ratio_antisense_count.sh ratio_antisense_count.sh.
+for script in `ls ratio_antisense_count.sh.*`
+do
+chmod 755 $script
+nohup ./$script > ${script}.nohup &
+done
+
+# Create working directory
+mkdir -p $HOME/scratch/ALV_MAC_RNAseq/edgeR/ratio_antisense
+
+# Copy gene count files into working directory
+for file in `find /home/dmagee/scratch/ALV_MAC_RNAseq/Count_summarisation/ratio_antisense -name N*H.reads`; do file2=`basename $file | perl -p -e 's/.reads//'`; cp /home/dmagee/scratch/ALV_MAC_RNAseq/Count_summarisation/ratio_antisense/$file2/$file2 $HOME/scratch/ALV_MAC_RNAseq/edgeR/ratio_antisense/$file2; done;
+
+# Perform subsequent ratio of antisense-sense genes analyses in R, follow pipeline: `Alv_mac_edgeR_paired_antisense_pipeline.R`
+
+
+###################################################################
+# Select unassigned reads post antisense gene count summarisation #
+###################################################################
+
+# Note that perl script, `sam_unassigned.pl`, was optimised to select all Unassigned_No_Features reads from SAM files
+
+# Enter working directory
+cd /home/dmagee/scratch/ALV_MAC_RNAseq/Annotated_BAM
+
+# Create shell script to select only the unassigned reads post featureCounts of sense reads
+for file in `ls /home/dmagee/scratch/ALV_MAC_RNAseq/Annotated_BAM/*_sense_unassigned.sam`; do sample=`basename $file | perl -p -e 's/_sense_unassigned.sam//'`; echo "perl /home/nnalpas/SVN/sam_unassigned.pl -sam $file -featurecount /workspace/scratch/dmagee/ALV_MAC_RNAseq/Count_summarisation/antisense/$sample/${sample}.reads -custom antisense" >> unassigned_antisense.sh; done;
+
+# Split and run all scripts on Stampede
+split -d -l 4 unassigned_antisense.sh unassigned_antisense.sh.
+for script in `ls unassigned_antisense.sh.*`
+do
+chmod 755 $script
+nohup ./$script &
+done
+
+# Rename files
+for file in `ls *_sense_unassigned_antisense_unassigned.sam`; do outfile=`echo $file | perl -p -e 's/\_sense\_unassigned(\_antisense\_unassigned\.sam)/$1/'`; mv $file $outfile; done;
+
+
+#########################################################
+# Summarisation count with featureCounts for novel gene #
+#########################################################
+
+# Use featureCounts to perform count summarisation; required package is featureCounts which is part of subread software, consult manual for details: http://bioinf.wehi.edu.au/subread-package/SubreadUsersGuide.pdf
+
+# Create working directories
+mkdir -p /home/dmagee/scratch/ALV_MAC_RNAseq/Count_summarisation/novel
+
+# Run featureCounts on SAM file containing multihits and uniquely mapped reads using stranded parameter
+cd /home/dmagee/scratch/ALV_MAC_RNAseq/Count_summarisation/novel
+for file in `ls /home/dmagee/scratch/ALV_MAC_RNAseq/Annotated_BAM/*H_antisense_unassigned.sam`; do sample=`basename $file | perl -p -e 's/_antisense_unassigned.sam//'`; echo "mkdir /home/dmagee/scratch/ALV_MAC_RNAseq/Count_summarisation/novel/$sample; cd /home/dmagee/scratch/ALV_MAC_RNAseq/Count_summarisation/novel/$sample; featureCounts -a /home/dmagee/scratch/ALV_MAC_RNAseq/Gene_annotation/Bos_taurus.UMD3.1.71_novel_251113.gtf -t exon -g gene_id -i $file -o $sample -s 1 -T 1 -R -p -B -C" >> novel_count.sh; done;
+
+# Split and run all scripts on Stampede
+split -d -l 4 novel_count.sh novel_count.sh.
+for script in `ls novel_count.sh.*`
+do
+chmod 755 $script
+nohup ./$script > ${script}.nohup &
+done
+
+# Summarise the annotation performed on each samples for stranded featureCounts run
+cd /workspace/scratch/dmagee/ALV_MAC_RNAseq/Count_summarisation/
+for file in `find /home/dmagee/scratch/ALV_MAC_RNAseq/Count_summarisation/novel/ -name N*H.reads`
+do
+echo echo "\`basename $file\` \`cut $file -f2 | sort | uniq -c | perl -p -e 's/\n/ /'\` >> annotation_summary_novel.txt" >> annotation_summary_novel.sh
+done
+
+# Run script on Stampede
+split -d -l 4 annotation_summary_novel.sh annotation_summary_novel.sh.
+for script in `ls annotation_summary_novel.sh.*`
+do
+chmod 755 $script
+nohup ./$script &
+done
+
+# Create working directory
+mkdir -p $HOME/scratch/ALV_MAC_RNAseq/edgeR/novel
+
+# Copy gene count files into working directory
+for file in `find /home/dmagee/scratch/ALV_MAC_RNAseq/Count_summarisation/novel -name N*H.reads`; do file2=`basename $file | perl -p -e 's/.reads//'`; cp /home/dmagee/scratch/ALV_MAC_RNAseq/Count_summarisation/novel/$file2/$file2 $HOME/scratch/ALV_MAC_RNAseq/edgeR/novel/$file2; done;
+
+# Perform subsequent novel genes analyses in R, follow pipeline: `Alv_mac_edgeR_paired_novel_gene_pipeline.R`
+
+
+##############################
+# Calculate genomic coverage #
+##############################
+
+# Create and go to working directory
+mkdir /home/dmagee/scratch/ALV_MAC_RNAseq/Genomic_coverage
+cd /home/dmagee/scratch/ALV_MAC_RNAseq/Genomic_coverage
+
+# Run featureCounts on SAM file containing multihits and uniquely mapped reads using stranded or reverse stranded parameters to summarise based on promoter, terminator, gene, UTRs and exon
+for file in `ls /home/dmagee/scratch/ALV_MAC_RNAseq/Annotated_BAM/*H.sam`; do sample=`basename $file | perl -p -e 's/\.sam//'`; echo "mkdir -p /home/dmagee/scratch/ALV_MAC_RNAseq/Genomic_coverage/stranded/promotor/$sample; cd /home/dmagee/scratch/ALV_MAC_RNAseq/Genomic_coverage/stranded/promotor/$sample; featureCounts -a /home/dmagee/scratch/ALV_MAC_RNAseq/Gene_annotation/Bos_taurus.UMD3.1.71_sense_251113.gtf -t promotor -g gene_id -i $file -o $sample -s 1 -T 1 -R -p -B -C" >> genomic_coverage.sh; done;
+for file in `ls /home/dmagee/scratch/ALV_MAC_RNAseq/Annotated_BAM/*H.sam`; do sample=`basename $file | perl -p -e 's/\.sam//'`; echo "mkdir -p /home/dmagee/scratch/ALV_MAC_RNAseq/Genomic_coverage/stranded/terminator/$sample; cd /home/dmagee/scratch/ALV_MAC_RNAseq/Genomic_coverage/stranded/terminator/$sample; featureCounts -a /home/dmagee/scratch/ALV_MAC_RNAseq/Gene_annotation/Bos_taurus.UMD3.1.71_sense_251113.gtf -t terminator -g gene_id -i $file -o $sample -s 1 -T 1 -R -p -B -C" >> genomic_coverage.sh; done;
+for file in `ls /home/dmagee/scratch/ALV_MAC_RNAseq/Annotated_BAM/*H.sam`; do sample=`basename $file | perl -p -e 's/\.sam//'`; echo "mkdir -p /home/dmagee/scratch/ALV_MAC_RNAseq/Genomic_coverage/stranded/gene/$sample; cd /home/dmagee/scratch/ALV_MAC_RNAseq/Genomic_coverage/stranded/gene/$sample; featureCounts -a /home/dmagee/scratch/ALV_MAC_RNAseq/Gene_annotation/Bos_taurus.UMD3.1.71_sense_251113.gtf -t gene -g gene_id -i $file -o $sample -s 1 -T 1 -R -p -B -C" >> genomic_coverage.sh; done;
+for file in `ls /home/dmagee/scratch/ALV_MAC_RNAseq/Annotated_BAM/*H.sam`; do sample=`basename $file | perl -p -e 's/\.sam//'`; echo "mkdir -p /home/dmagee/scratch/ALV_MAC_RNAseq/Genomic_coverage/stranded/five_prime_UTR/$sample; cd /home/dmagee/scratch/ALV_MAC_RNAseq/Genomic_coverage/stranded/five_prime_UTR/$sample; featureCounts -a /home/dmagee/scratch/ALV_MAC_RNAseq/Gene_annotation/Bos_taurus.UMD3.1.71_sense_251113.gtf -t five_prime_UTR -g gene_id -i $file -o $sample -s 1 -T 1 -R -p -B -C" >> genomic_coverage.sh; done;
+for file in `ls /home/dmagee/scratch/ALV_MAC_RNAseq/Annotated_BAM/*H.sam`; do sample=`basename $file | perl -p -e 's/\.sam//'`; echo "mkdir -p /home/dmagee/scratch/ALV_MAC_RNAseq/Genomic_coverage/stranded/three_prime_UTR/$sample; cd /home/dmagee/scratch/ALV_MAC_RNAseq/Genomic_coverage/stranded/three_prime_UTR/$sample; featureCounts -a /home/dmagee/scratch/ALV_MAC_RNAseq/Gene_annotation/Bos_taurus.UMD3.1.71_sense_251113.gtf -t three_prime_UTR -g gene_id -i $file -o $sample -s 1 -T 1 -R -p -B -C" >> genomic_coverage.sh; done;
+for file in `ls /home/dmagee/scratch/ALV_MAC_RNAseq/Annotated_BAM/*H.sam`; do sample=`basename $file | perl -p -e 's/\.sam//'`; echo "mkdir -p /home/dmagee/scratch/ALV_MAC_RNAseq/Genomic_coverage/stranded/exon/$sample; cd /home/dmagee/scratch/ALV_MAC_RNAseq/Genomic_coverage/stranded/exon/$sample; featureCounts -a /home/dmagee/scratch/ALV_MAC_RNAseq/Gene_annotation/Bos_taurus.UMD3.1.71_sense_251113.gtf -t exon -g gene_id -i $file -o $sample -s 1 -T 1 -R -p -B -C" >> genomic_coverage.sh; done;
+for file in `ls /home/dmagee/scratch/ALV_MAC_RNAseq/Annotated_BAM/*H.sam`; do sample=`basename $file | perl -p -e 's/\.sam//'`; echo "mkdir -p /home/dmagee/scratch/ALV_MAC_RNAseq/Genomic_coverage/reverse_stranded/promotor/$sample; cd /home/dmagee/scratch/ALV_MAC_RNAseq/Genomic_coverage/reverse_stranded/promotor/$sample; featureCounts -a /home/dmagee/scratch/ALV_MAC_RNAseq/Gene_annotation/Bos_taurus.UMD3.1.71_sense_251113.gtf -t promotor -g gene_id -i $file -o $sample -s 2 -T 1 -R -p -B -C" >> genomic_coverage.sh; done;
+for file in `ls /home/dmagee/scratch/ALV_MAC_RNAseq/Annotated_BAM/*H.sam`; do sample=`basename $file | perl -p -e 's/\.sam//'`; echo "mkdir -p /home/dmagee/scratch/ALV_MAC_RNAseq/Genomic_coverage/reverse_stranded/terminator/$sample; cd /home/dmagee/scratch/ALV_MAC_RNAseq/Genomic_coverage/reverse_stranded/terminator/$sample; featureCounts -a /home/dmagee/scratch/ALV_MAC_RNAseq/Gene_annotation/Bos_taurus.UMD3.1.71_sense_251113.gtf -t terminator -g gene_id -i $file -o $sample -s 2 -T 1 -R -p -B -C" >> genomic_coverage.sh; done;
+for file in `ls /home/dmagee/scratch/ALV_MAC_RNAseq/Annotated_BAM/*H.sam`; do sample=`basename $file | perl -p -e 's/\.sam//'`; echo "mkdir -p /home/dmagee/scratch/ALV_MAC_RNAseq/Genomic_coverage/reverse_stranded/gene/$sample; cd /home/dmagee/scratch/ALV_MAC_RNAseq/Genomic_coverage/reverse_stranded/gene/$sample; featureCounts -a /home/dmagee/scratch/ALV_MAC_RNAseq/Gene_annotation/Bos_taurus.UMD3.1.71_sense_251113.gtf -t gene -g gene_id -i $file -o $sample -s 2 -T 1 -R -p -B -C" >> genomic_coverage.sh; done;
+for file in `ls /home/dmagee/scratch/ALV_MAC_RNAseq/Annotated_BAM/*H.sam`; do sample=`basename $file | perl -p -e 's/\.sam//'`; echo "mkdir -p /home/dmagee/scratch/ALV_MAC_RNAseq/Genomic_coverage/reverse_stranded/five_prime_UTR/$sample; cd /home/dmagee/scratch/ALV_MAC_RNAseq/Genomic_coverage/reverse_stranded/five_prime_UTR/$sample; featureCounts -a /home/dmagee/scratch/ALV_MAC_RNAseq/Gene_annotation/Bos_taurus.UMD3.1.71_sense_251113.gtf -t five_prime_UTR -g gene_id -i $file -o $sample -s 2 -T 1 -R -p -B -C" >> genomic_coverage.sh; done;
+for file in `ls /home/dmagee/scratch/ALV_MAC_RNAseq/Annotated_BAM/*H.sam`; do sample=`basename $file | perl -p -e 's/\.sam//'`; echo "mkdir -p /home/dmagee/scratch/ALV_MAC_RNAseq/Genomic_coverage/reverse_stranded/three_prime_UTR/$sample; cd /home/dmagee/scratch/ALV_MAC_RNAseq/Genomic_coverage/reverse_stranded/three_prime_UTR/$sample; featureCounts -a /home/dmagee/scratch/ALV_MAC_RNAseq/Gene_annotation/Bos_taurus.UMD3.1.71_sense_251113.gtf -t three_prime_UTR -g gene_id -i $file -o $sample -s 2 -T 1 -R -p -B -C" >> genomic_coverage.sh; done;
+for file in `ls /home/dmagee/scratch/ALV_MAC_RNAseq/Annotated_BAM/*H.sam`; do sample=`basename $file | perl -p -e 's/\.sam//'`; echo "mkdir -p /home/dmagee/scratch/ALV_MAC_RNAseq/Genomic_coverage/reverse_stranded/exon/$sample; cd /home/dmagee/scratch/ALV_MAC_RNAseq/Genomic_coverage/reverse_stranded/exon/$sample; featureCounts -a /home/dmagee/scratch/ALV_MAC_RNAseq/Gene_annotation/Bos_taurus.UMD3.1.71_sense_251113.gtf -t exon -g gene_id -i $file -o $sample -s 2 -T 1 -R -p -B -C" >> genomic_coverage.sh; done;
+
+# Split and run all scripts on Stampede
+split -d -l 88 genomic_coverage.sh genomic_coverage.sh.
+for script in `ls genomic_coverage.sh.*`
+do
+chmod 755 $script
+nohup ./$script > ${script}.nohup &
+done
+
+# Use perl script to summarise the genomic coverage
+
+
+########################################
+# Annotate each reads in the SAM files #
+########################################
+
+# Note that perl script, `sam_file_edit.pl`, was optimised to work specifically with aligned paired-end reads with stranded, reverse stranded and novel gene reads files obtained from featureCounts, also this perl script works only on SAM files from the experiment ALV_MAC_RNAseq
+
+# Create a working directory and enter this directory
+cd /home/dmagee/scratch/ALV_MAC_RNAseq/Annotated_BAM
+
+# Annotate SAM file using the featureCounts results for both stranded and reverse stranded runs
+for file in `ls /home/dmagee/scratch/ALV_MAC_RNAseq/Annotated_BAM/*H.sam`; do sample=`basename $file | perl -p -e 's/\.sam//'`; echo "perl /home/nnalpas/SVN/sam_file_edit.pl -sam $file -sense /home/dmagee/scratch/ALV_MAC_RNAseq/Count_summarisation/sense/${sample}/${sample}.reads -antisense /home/dmagee/scratch/ALV_MAC_RNAseq/Count_summarisation/antisense/${sample}/${sample}.reads -novel /home/dmagee/scratch/ALV_MAC_RNAseq/Count_summarisation/novel/${sample}/${sample}.reads" >> final_annotation_sam.sh; done;
+
+# Run all scripts on Stampede
+split -d -l 4 final_annotation_sam.sh final_annotation_sam.sh.
+for script in `ls final_annotation_sam.sh.*`
+do
+chmod 755 $script
+nohup ./$script > ${script}_nohup &
+done
+
+
+#########################################
+# Compress all SAM files into BAM files #
+#########################################
+
+# Go to working directory
+cd /home/dmagee/scratch/ALV_MAC_RNAseq/Annotated_BAM
+
+# Compress all SAM files into BAM files
+for file in `ls /home/dmagee/scratch/ALV_MAC_RNAseq/Annotated_BAM/*_assigned.sam`; do sample=`basename $file | perl -p -e 's/_assigned.sam//'`; echo "samtools view -bhS $file | samtools sort - ${sample}" >> final_sam_to_bam_sorted.sh; done;
+
+# Run all scripts on Stampede
+split -d -l 4 final_sam_to_bam_sorted.sh final_sam_to_bam_sorted.sh.
+for script in `ls final_sam_to_bam_sorted.sh.*`
+do
+chmod 755 $script
+nohup ./$script > ${script}_nohup &
+done
+
+# Remove all SAM files which have been compressed into BAM after checking the BAM files
+rm -f /workspace/scratch/dmagee/ALV_MAC_RNAseq/Annotated_BAM/*.sam
+
+# Once sure that the BAM files are correct, remove the original SAM files
+for file in `find /home/dmagee/scratch/ALV_MAC_RNAseq/Alignment/Btaurus/ -name *CN*_Aligned.out.sam`; do rm -f $file; done;
+for file in `find /home/dmagee/scratch/ALV_MAC_RNAseq/Alignment/Btaurus/ -name *MB*_Aligned.out.sam`; do rm -f $file; done;
+
+
+####################################################################
+# Concatenate BAM files and create genome for visualization in IGV #
+####################################################################
+
+# Create and enter the working directory
+mkdir /home/dmagee/scratch/ALV_MAC_RNAseq/IGV
+cd /home/dmagee/scratch/ALV_MAC_RNAseq/IGV
+
+# Collect the header from all the files to be merged
+samtools view -H /home/dmagee/scratch/ALV_MAC_RNAseq/Annotated_BAM/N1178_CN_0H.bam | grep -P "^@HD" >> header.sam
+for file in `ls /home/dmagee/scratch/ALV_MAC_RNAseq/Annotated_BAM/*.bam`; do samtools view -H $file | grep -P "^@RG" >> header.sam; done;
+samtools view -H /home/dmagee/scratch/ALV_MAC_RNAseq/Annotated_BAM/N1178_CN_0H.bam | grep -P "^@SQ" >> header.sam
+
+# Merge all BAM files according to their treatment/time points
+for group in CN_0H CN_2H CN_6H CN_24H CN_48H MB_2H MB_6H MB_24H MB_48H; do echo "samtools merge -r -h header.sam ALV_${group}.bam `echo /home/dmagee/scratch/ALV_MAC_RNAseq/Annotated_BAM/*${group}*.bam`" >> merge_index_bam.sh; echo "samtools index ALV_${group}.bam" >> merge_index_bam.sh; done;
+
+# Run all scripts on Stampede
+split -d -l 2 merge_index_bam.sh merge_index_bam.sh.
+for script in `ls merge_index_bam.sh.*`
+do
+chmod 755 $script
+nohup ./$script > ${script}_nohup &
+done
+
+# In IGV create custome genome file containing the UMD3.1.71 reference annotation with the novel gene annotation
+# Visualize the treatment/time point BAM files in IGV
+
+
+####################################################################################
+# Compress all reads information of individual samples obtained from featureCounts #
+####################################################################################
+
+# Go to working directory for Count_summarisation
+cd /home/dmagee/scratch/ALV_MAC_RNAseq/Count_summarisation/
+
+# Compress all reads files of individual samples from featureCounts
+for file in `find /home/dmagee/scratch/ALV_MAC_RNAseq/Count_summarisation/ -name *.reads`; do echo "gzip -9 $file" >> reads_info_compression.sh; done;
+
+# Run all scripts on Stampede
+split -d -l 31 reads_info_compression.sh reads_info_compression.sh.
+for script in `ls reads_info_compression.sh.*`
+do
+chmod 755 $script
+nohup ./$script > ${script}_nohup &
+done
+
+# Go to working directory for Genomic_coverage
+cd /home/dmagee/scratch/ALV_MAC_RNAseq/Genomic_coverage/
+
+# Compress all reads files of individual samples from featureCounts
+for file in `find /home/dmagee/scratch/ALV_MAC_RNAseq/Genomic_coverage/ -name *.reads`; do echo "gzip -9 $file" >> coverage_reads_compression.sh; done;
+
+# Run all scripts on Stampede
+split -d -l 53 coverage_reads_compression.sh coverage_reads_compression.sh.
+for script in `ls coverage_reads_compression.sh.*`
+do
+chmod 755 $script
+nohup ./$script > ${script}_nohup &
+done
+
+
+############################################################
+# Compress all SAM files into BAM files for the TB samples #
+############################################################
+
+# Enter working directory
+cd /workspace/scratch/dmagee/ALV_MAC_RNAseq/Annotated_BAM/
+
+# Compress all SAM files into BAM files
+for file in `find /workspace/scratch/dmagee/ALV_MAC_RNAseq/Alignment/Btaurus/ -name "*_Aligned.out.sam"`; do sample=`basename $file | perl -p -e 's/_Aligned.out.sam//'`; echo "samtools view -bhS $file | samtools sort - ${sample}" >> TB_sam_to_bam_sorted.sh; done;
+
+# Run all scripts on Stampede
+split -d -l 4 TB_sam_to_bam_sorted.sh TB_sam_to_bam_sorted.sh.
+for script in `ls TB_sam_to_bam_sorted.sh.*`
+do
+chmod 755 $script
+nohup ./$script > ${script}_nohup &
+done
+
+# Remove all SAM files which have been compressed into BAM after checking the BAM files
+for file in `find /workspace/scratch/dmagee/ALV_MAC_RNAseq/Alignment/Btaurus/ -name "*_Aligned.out.sam"`; do rm -f $file; done;
+
+
+############################################
+# ALV_MAC_RNAseq project authorised access #
+############################################
+
+# In order for the different users involved in the ALV_MAC project to access generated files, these commands needs to be run on regular basis (ideally after each work session)
+
+# Change the ownership and access rights of all files created to date for the group, to be run by dmagee and/or nnalpas
+chown -R dmagee:alvmac /workspace/scratch/dmagee/ALV_MAC_RNAseq
+chown -R nnalpas:alvmac /workspace/scratch/dmagee/ALV_MAC_RNAseq
+chmod -R 775 /workspace/scratch/dmagee/ALV_MAC_RNAseq
+for file in `find /workspace/scratch/dmagee/ALV_MAC_RNAseq/ -name '*.txt'`; do chmod -R 664 $file; done;
+for file in `find /workspace/scratch/dmagee/ALV_MAC_RNAseq/ -name '*.gtf'`; do chmod -R 664 $file; done;
+for file in `find /workspace/scratch/dmagee/ALV_MAC_RNAseq/ -name '*.gff'`; do chmod -R 664 $file; done;
+for file in `find /workspace/scratch/dmagee/ALV_MAC_RNAseq/ -name '*.zip'`; do chmod -R 664 $file; done;
+for file in `find /workspace/scratch/dmagee/ALV_MAC_RNAseq/ -name '*.fa'`; do chmod -R 664 $file; done;
+for file in `find /workspace/scratch/dmagee/ALV_MAC_RNAseq/ -name '*nohup'`; do chmod -R 664 $file; done;
+for file in `find /workspace/scratch/dmagee/ALV_MAC_RNAseq/ -name '*.sh'`; do chmod -R 775 $file; done;
+for file in `find /workspace/scratch/dmagee/ALV_MAC_RNAseq/ -name '*.gz'`; do chmod -R 444 $file; done;
+for file in `find /workspace/scratch/dmagee/ALV_MAC_RNAseq/ -name '*.bam'`; do chmod -R 444 $file; done;
+
