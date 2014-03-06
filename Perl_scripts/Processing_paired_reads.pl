@@ -24,7 +24,7 @@ my $trim_mate2;      # Input number of bases to be trimmed at 3'-end of reads ma
 my $adapter_filt;    # Variable to determine if adapter filtering need to be performed
 my $amatch_param;       # Variable to determine the parameters to provide amatch for adpater filtering
 my $quality_filt;     # Variable to determine if overall quality read filtering need to be performed
-my $quality_bases;      # Variable to determine the percentage of bases required to be above the quality threshold
+my $quality_bases;      # Variable to determine the number of bases required to be above the quality threshold
 my $illumina_version;   # Variable to determine the illumina version used for phred score encoding
 my $fh;         # Filehandle output fastq file for each index
 
