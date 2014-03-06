@@ -103,7 +103,7 @@ for file in `ls /home/nnalpas/scratch/ALV_MAC_RNAseq/fastq_sequence/pool_*_indic
 cp /home/nnalpas/scratch/ALV_MAC_RNAseq/fastq_sequence/Adapter_sequence.txt ./Adapter_sequence.txt
 
 # Create shell script to perform deconvolution of each pool fastq files
-for file in `find /workspace/storage/nnalpas/ALV_MAC_RNAseq/fastq_sequence/raw_reads/ -name *1.fq.gz`; do file2=`echo $file | perl -p -e 's/1(\.fq.gz)$/2$1/'`; pool=`echo $file | perl -p -e 's/^.*DM-pool-(.).*$/$1/'`; echo "perl /home/nnalpas/SVN/Processing_paired_reads.pl -seqfile1 $file -seqfile2 $file2 -indices $HOME/scratch/ALV_MAC_RNAseq/fastq_sequence/pool_${pool}_indices.txt -adapter_filt $HOME/scratch/ALV_MAC_RNAseq/fastq_sequence/Adapter_sequence.txt -amatch_param i_3_S3_D0_I0 -quality_filt 20 -quality_bases 25 -trim_mate1 5end_0_keep_90_3end_0 -trim_mate2 5end_0_keep_90_3end_0" >> deconv_filt_pool${pool}.sh; done;
+for file in `find /workspace/storage/nnalpas/ALV_MAC_RNAseq/fastq_sequence/raw_reads/ -name *1.fq.gz`; do file2=`echo $file | perl -p -e 's/1(\.fq.gz)$/2$1/'`; pool=`echo $file | perl -p -e 's/^.*DM-pool-(.).*$/$1/'`; echo "perl /home/nnalpas/SVN/Processing_paired_reads.pl -seqfile1 $file -seqfile2 $file2 -indices $HOME/scratch/ALV_MAC_RNAseq/fastq_sequence/pool_${pool}_indices.txt -adapter_filt $HOME/scratch/ALV_MAC_RNAseq/fastq_sequence/Adapter_sequence.txt -amatch_param i_3_S3_D0_I0 -quality_filt 20 -quality_bases 25 -trim_mate1 5end_0_keep_90_3end_0 -trim_mate2 5end_0_keep_90_3end_0 -illumina_version 1.5" >> deconv_filt_pool${pool}.sh; done;
 
 # Split and run all scripts on Stampede
 for script in `ls deconv_filt_*.sh`
