@@ -171,6 +171,17 @@ mkdir $HOME/scratch/ALV_MAC_RNAseq/quality_check/post_alignment
 
 # Required software is STAR, consult manual/tutorial for details: http://code.google.com/p/rna-star/downloads/detail?name=STARmanual_2.3.0.1.pdf&can=2&q=
 
+# Download the Bos taurus reference genome from ftp://ftp.ensembl.org/pub/release-71/fasta/bos_taurus/dna/ and transfer it to your user account
+mkdir -p /workspace/storage/genomes/bostaurus/UMD3.1.71/source_file
+cd /workspace/storage/genomes/bostaurus/UMD3.1.71/source_file
+nohup wget -v -o logfile ftp://ftp.ensembl.org/pub/release-71/fasta/bos_taurus/dna/Bos_taurus.UMD3.1.71.dna.toplevel.fa.gz &
+gunzip Bos_taurus.UMD3.1.71.dna.toplevel.fa.gz
+
+# Index the reference genome using STAR
+mkdir -p /workspace/storage/genomes/bostaurus/UMD3.1.71/STAR2.3.0e/STAR2.3.0e_no_annotation/
+cd /workspace/storage/genomes/bostaurus/UMD3.1.71/STAR2.3.0e/STAR2.3.0e_no_annotation/
+nohup STAR --runMode genomeGenerate --genomeDir /workspace/storage/genomes/bostaurus/UMD3.1.71/STAR2.3.0e/STAR2.3.0e_no_annotation/ --genomeFastaFiles /workspace/storage/genomes/bostaurus/UMD3.1.71/source_file/Bos_taurus.UMD3.1.71.dna.toplevel.fa --runThreadN 8 &
+
 # Create and enter alignment working directory
 mkdir $HOME/scratch/ALV_MAC_RNAseq/Alignment
 cd $HOME/scratch/ALV_MAC_RNAseq/Alignment
