@@ -426,67 +426,6 @@ head(Full_DE)
 # Write into a table the full DE call data
 write.matrix(x=Full_DE, file="Full_DE_sense.txt", sep = "\t")
 
-########################
-# Time series analysis #
-########################
-
-# Select biomaRt database and dataset (use biomaRt from Ensembl 71: Apr 2013)
-listMarts(host='Apr2013.archive.ensembl.org')
-GO_mart <- useMart(host='Apr2013.archive.ensembl.org', biomart="ENSEMBL_MART_ENSEMBL")
-listDatasets(GO_mart)
-GO_mart <- useMart(host='Apr2013.archive.ensembl.org', biomart="ENSEMBL_MART_ENSEMBL", dataset = "btaurus_gene_ensembl")
-
-# Build a biomarRt query to obtain ID, name and description for each GO categories associated with genes
-GO_bioMart_query <- getBM(attributes=c("ensembl_gene_id", "go_id", "name_1006", "definition_1006"), filters="ensembl_gene_id", values=rownames(Count$counts), mart=GO_mart, uniqueRows=TRUE, bmHeader=TRUE)
-head(GO_bioMart_query)
-GO_description <- GO_bioMart_query[,-1]
-dim(GO_description)
-GO_description <- unique(GO_description)
-dim(GO_description)
-head(GO_description)
-
-# Format the GO annotation for compatibility with STEM
-GO_annotation <- GO_bioMart_query[,c(1,2)]
-GO_annotation <- aggregate(go_id ~ ensembl_gene_id, FUN = "as.vector", data=GO_annotation, na.action="as.vector")
-head(GO_annotation)
-
-# Ouptut GO annotation and description data
-write.matrix(x=GO_annotation, file="GO_annotation.txt", sep = "\t")
-write.table(x=GO_description, file="GO_description.txt", sep = "\t", quote=FALSE, row.names=FALSE, col.names=TRUE)
-
-# Merge all DE table for the different time points into a single dataframe
-time_serie <- merge(x=DE_MB.2H$table[,c(3,7)], y=DE_MB.6H$table[,c(3,7)], by="row.names")
-rownames(time_serie) <- time_serie[,1]
-time_serie <- time_serie[,-1]
-colnames(time_serie) <- c("logFC_2H", "FDR_2H", "logFC_6H", "FDR_6H")
-time_serie <- merge(x=time_serie, y=DE_MB.24H$table[,c(3,7)], by="row.names")
-rownames(time_serie) <- time_serie[,1]
-time_serie <- time_serie[,-1]
-colnames(time_serie) <- c("logFC_2H", "FDR_2H", "logFC_6H", "FDR_6H", "logFC_24H", "FDR_24H")
-time_serie <- merge(x=time_serie, y=DE_MB.48H$table[,c(3,7)], by="row.names")
-rownames(time_serie) <- time_serie[,1]
-time_serie <- time_serie[,-1]
-colnames(time_serie) <- c("logFC_2H", "FDR_2H", "logFC_6H", "FDR_6H", "logFC_24H", "FDR_24H", "logFC_48H", "FDR_48H")
-head(time_serie)
-
-# Transform dataframe into matrix and add one new column
-time_serie <- data.matrix(time_serie)
-class(time_serie)
-
-# Filter out genes which are not differentially expressed at any of the time point
-list_DEG <- scan(file="list_DEG.txt", what="character", sep="\n")
-DE_time_serie <- rownames(time_serie) %in% list_DEG
-time_serie <- time_serie[DE_time_serie,]
-head(time_serie)
-
-# Remove the FDR value from matrix in order to be compatible with STEM software
-STEM_time_serie <- time_serie[,c(1,3,5,7)]
-head(STEM_time_serie)
-
-# Ouptut DEG data over time
-write.table(x=STEM_time_serie, file="STEM_time_serie.txt",  sep="\t", quote=FALSE, row.names=TRUE, col.names=TRUE)
-write.table(x=time_serie, file="DEG_time_serie.txt",  sep="\t", quote=FALSE, row.names=TRUE, col.names=TRUE)
-
 #####################################################
 # Bovine gene annotation by orthology to H. sapiens #
 #####################################################
@@ -661,70 +600,7 @@ head(ortholog_novel_DE_MB_48H)
 # Use of Sigora for over-representation of gene-pair signatures in pathways #
 #############################################################################
 
-# Create a function to perform Sigora analysis based on user-defined parameters
-sigora_analysis <- function(input, fdr, logfc, direction, output) {
-  # Load the library Sigora
-  library(sigora)
-  # Output parameters of the analysis
-  write.table(x=paste("Sigora analysis on input: ", deparse(substitute(input)), " with gene below FDR: ", fdr, " and direction of expression: ", direction, " of ", logfc, "log fold-change."), file=output, sep="\t", quote=FALSE, row.names=TRUE, col.names=TRUE, append=TRUE)
-  # Create the list of target gene according to user specified parameters
-  if (direction == "up") {
-    target <- input$table[(input$table$FDR < fdr),]
-    target <- rownames(target[(target$logFC > logfc),])
-  }
-  else if (direction == "down") {
-    target <- input$table[(input$table$FDR < fdr),]
-    target <- rownames(target[(target$logFC < logfc),])
-  }
-  else if (direction == "all") {
-    target <- input$table[(input$table$FDR < fdr),]
-    target <- rownames(target[((target$logFC > logfc) || (target$logFC < logfc)),])
-  }
-  target <- as.matrix(target)
-  colnames(target) <- "ensembl_gene_id"
-  write.table(x=paste("Number of bovine target genes: ", length(target)), file=output, sep="\t", quote=FALSE, row.names=TRUE, col.names=TRUE, append=TRUE)
-  # Obtain the human gene ID for the target bovine gene
-  homo_id <- merge(x=target, y=human_ortholog, by="ensembl_gene_id")
-  homo_id <- as.vector(homo_id[,-1])
-  write.table(x=paste("Number of human ortholog target genes: ", length(homo_id)), file=output, sep="\t", quote=FALSE, row.names=TRUE, col.names=TRUE, append=TRUE)
-  # Convert human gene ID to Sigora ID for analysis purpose
-  sig_id <<- ens_converter(homo_id)
-  write.table(x=paste("Number of Sigora corresponding ID: ", length(sig_id)), file=output, sep="\t", quote=FALSE, row.names=TRUE, col.names=TRUE, append=TRUE)
-  write.table(x="------------------------------------------------------------------------------------------------------------------------------------------------------", file=output, sep="\t", quote=FALSE, row.names=TRUE, col.names=TRUE, append=TRUE)
-  # Perform Sigora pathway analysis using Reactome database and outpout results
-  sink(file=output, append=TRUE, split=TRUE)
-  sigs(samplename=sig_id, archive="R", markers=1, level=4)
-  sink()
-  write.table(x="Summary results (based on Reactome):", file=output, sep="\t", quote=FALSE, row.names=TRUE, col.names=TRUE, append=TRUE)
-  write.table(x=summary_results, file=output, sep="\t", quote=FALSE, row.names=TRUE, col.names=TRUE, append=TRUE)
-  write.table(x="------------------------------------------------------------------------------------------------------------------------------------------------------", file=output, sep="\t", quote=FALSE, row.names=TRUE, col.names=TRUE, append=TRUE)
-  # Perform Sigora pathway analysis using Kegg database and outpout results
-  sink(file=output, append=TRUE, split=TRUE)
-  sigs(samplename=sig_id, archive="k", markers=1, level=2)
-  sink()
-  write.table(x="Summary results (based on Kegg):", file=output, sep="\t", quote=FALSE, row.names=TRUE, col.names=TRUE, append=TRUE)
-  write.table(x=summary_results, file=output, sep="\t", quote=FALSE, row.names=TRUE, col.names=TRUE, append=TRUE)
-}
-
-# Perform Sigora analysis using different parameters
-sigora <- sigora_analysis(input=DE_MB.2H, fdr=0.05, logfc=0, direction="up", output="Sigora_Up_MB2H.txt")
-sigora <- sigora_analysis(input=DE_MB.2H, fdr=0.05, logfc=0, direction="down", output="Sigora_Down_MB2H.txt")
-sigora <- sigora_analysis(input=DE_MB.2H, fdr=0.05, logfc=0, direction="all", output="Sigora_MB2H.txt")
-sigora <- sigora_analysis(input=DE_MB.2H, fdr=0.001, logfc=0, direction="all", output="Sigora_fdr0.001_MB2H.txt")
-sigora <- sigora_analysis(input=DE_MB.6H, fdr=0.05, logfc=0, direction="up", output="Sigora_Up_MB6H.txt")
-sigora <- sigora_analysis(input=DE_MB.6H, fdr=0.05, logfc=0, direction="down", output="Sigora_Down_MB6H.txt")
-sigora <- sigora_analysis(input=DE_MB.6H, fdr=0.05, logfc=0, direction="all", output="Sigora_MB6H.txt")
-sigora <- sigora_analysis(input=DE_MB.6H, fdr=0.001, logfc=0, direction="all", output="Sigora_fdr0.001_MB6H.txt")
-sigora <- sigora_analysis(input=DE_MB.24H, fdr=0.05, logfc=0, direction="up", output="Sigora_Up_MB24H.txt")
-sigora <- sigora_analysis(input=DE_MB.24H, fdr=0.05, logfc=0, direction="down", output="Sigora_Down_MB24H.txt")
-sigora <- sigora_analysis(input=DE_MB.24H, fdr=0.05, logfc=0, direction="all", output="Sigora_MB24H.txt")
-sigora <- sigora_analysis(input=DE_MB.24H, fdr=0.001, logfc=0, direction="all", output="Sigora_fdr0.001_MB24H.txt")
-sigora <- sigora_analysis(input=DE_MB.48H, fdr=0.05, logfc=0, direction="up", output="Sigora_Up_MB48H.txt")
-sigora <- sigora_analysis(input=DE_MB.48H, fdr=0.05, logfc=0, direction="down", output="Sigora_Down_MB48H.txt")
-sigora <- sigora_analysis(input=DE_MB.48H, fdr=0.05, logfc=0, direction="all", output="Sigora_MB48H.txt")
-sigora <- sigora_analysis(input=DE_MB.48H, fdr=0.001, logfc=0, direction="all", output="Sigora_fdr0.001_MB48H.txt")
-
-# Create a function to perform Sigora analysis based on user-defined parameters
+# Create a function to perform Sigora analysis based on user-defined parameters (this function takes human ID only)
 sigora_analysis_human <- function(input, fdr, logfc, direction, output) {
   # Load the library Sigora
   library(sigora)
@@ -802,14 +678,6 @@ install.packages("httr")
 install.packages("stringr")
 install.packages("digest")
 install.packages("png")
-install.packages("")
-install.packages("")
-install.packages("")
-install.packages("")
-install.packages("")
-install.packages("")
-install.packages("")
-install.packages("")
 
 # Output the different data to use in Pathway-guide
 write.table(x=DE_MB.2H$table[(DE_MB.2H$table$FDR < 0.05),c(10,14)], file="Sig_MB_sense.2H.txt", sep="\t", quote=FALSE, row.names=TRUE, col.names=TRUE)
@@ -822,14 +690,14 @@ write.table(x=ortholog_novel_DE_MB_24H[(ortholog_novel_DE_MB_24H$FDR < 0.05),c(1
 write.table(x=ortholog_novel_DE_MB_48H[(ortholog_novel_DE_MB_48H$FDR < 0.05),c(1,2,5)], file="Sig_MB_sense.48H(novel).txt", sep="\t", quote=FALSE, row.names=FALSE, col.names=TRUE)
 write.table(x=ortholog_novel_DE, file="DE_MB_sense_novel(Hsapiens).txt", sep="\t", quote=FALSE, row.names=FALSE, col.names=TRUE)
 
-#########################################################################
-# Compare the different pathways obtained with Sigora and Pathway-guide #
-#########################################################################
+##############################################################################
+# Compare the different KEGG pathways obtained with Sigora and Pathway-guide #
+##############################################################################
 
 # Load required library
 library(gdata)
 
-# Read in the lists of pathways obtained with Pathway-guide from kegg
+# Read in the lists of pathways obtained with Pathway-guide from KEGG
 Path_MB2H_novel <- read.xls(xls="C:/Users/nnalpas/Documents/PhD project/Alveolar macrophages/RNA-seq analysis/Results/Pathway-guide/KEGG/Pathway_Sig_MB_sense_2H(novel)/Adipocytokine signaling pathway.xls", sheet=1, header=TRUE, row.names=2, )
 colnames(Path_MB2H_novel) <- gsub(pattern="$", replacement="_Pathguide", x=colnames(Path_MB2H_novel), perl=TRUE)
 head(Path_MB2H_novel)
@@ -847,28 +715,18 @@ colnames(Path_MB48H_novel) <- gsub(pattern="$", replacement="_Pathguide", x=coln
 head(Path_MB48H_novel)
 dim(Path_MB48H_novel)
 
-# Read in the lists of pathways obtained with Pathway-guide from Reactome
-Path_MB2H_novel <- read.xls(xls="C:/Users/nnalpas/Documents/PhD project/Alveolar macrophages/RNA-seq analysis/Results/Pathway-guide/Reactome/Pathway_Sig_MB_sense_2H(novel)/B Cell Activation.xls", sheet=1, header=TRUE, row.names=2, )
-colnames(Path_MB2H_novel) <- gsub(pattern="$", replacement="_Pathguide", x=colnames(Path_MB2H_novel), perl=TRUE)
-head(Path_MB2H_novel)
-dim(Path_MB2H_novel)
-Path_MB6H_novel <- read.xls(xls="C:/Users/nnalpas/Documents/PhD project/Alveolar macrophages/RNA-seq analysis/Results/Pathway-guide/Reactome/Pathway_Sig_MB_sense_6H(novel)/B Cell Activation.xls", sheet=1, header=TRUE, row.names=2)
-colnames(Path_MB6H_novel) <- gsub(pattern="$", replacement="_Pathguide", x=colnames(Path_MB6H_novel), perl=TRUE)
-head(Path_MB6H_novel)
-dim(Path_MB6H_novel)
-Path_MB24H_novel <- read.xls(xls="C:/Users/nnalpas/Documents/PhD project/Alveolar macrophages/RNA-seq analysis/Results/Pathway-guide/Reactome/Pathway_Sig_MB_sense_24H(novel)/B Cell Activation.xls", sheet=1, header=TRUE, row.names=2)
-colnames(Path_MB24H_novel) <- gsub(pattern="$", replacement="_Pathguide", x=colnames(Path_MB24H_novel), perl=TRUE)
-head(Path_MB24H_novel)
-dim(Path_MB24H_novel)
-Path_MB48H_novel <- read.xls(xls="C:/Users/nnalpas/Documents/PhD project/Alveolar macrophages/RNA-seq analysis/Results/Pathway-guide/Reactome/Pathway_Sig_MB_sense_48H(novel)/B Cell Activation.xls", sheet=1, header=TRUE, row.names=2)
-colnames(Path_MB48H_novel) <- gsub(pattern="$", replacement="_Pathguide", x=colnames(Path_MB48H_novel), perl=TRUE)
-head(Path_MB48H_novel)
-dim(Path_MB48H_novel)
-
-# Create a function to read in the lists of Kegg pathways obtained with Sigora
-sigora_input <- function(file) {
+# Create a function to read in the lists of pathways obtained with Sigora according to database
+sigora_input <- function(file, database) {
   sigora_path <- read.table(file=file, header=FALSE, sep="\t", quote="", dec=".", na.strings="NA", col.names=c("row", "count",  "weightsum",  "pwyid",  "pwyname",  "p_value",  "adj.p_value",	"round_sum",	"m",	"n",	"k"), fill=TRUE, blank.lines.skip=TRUE, stringsAsFactors=FALSE)
-  sigora_path <- sigora_path[(grep(pattern="TRUE", x=(sigora_path[,2]=="Summary results (based on Kegg):")))+2:nrow(sigora_path),-1]
+  if (database == "KEGG") {
+    sigora_path <- sigora_path[(grep(pattern="TRUE", x=(sigora_path[,2]=="Summary results (based on Kegg):")))+2:nrow(sigora_path),-1]
+  }
+  else if (database == "Reactome") {
+    sigora_path <- sigora_path[((grep(pattern="TRUE", x=(sigora_path[,2]=="Summary results (based on Reactome):")))+2):((grep(pattern="TRUE", x=(sigora_path[,1]=='[1] "KEGG"')))-4),-1]
+  }
+  else {
+    stop("Non authorised value for database! Please try again with either KEGG or Reactome values!")
+  }
   sigora_path <- sigora_path[complete.cases(sigora_path[,1]),]
   row.names(sigora_path) <- sigora_path$pwyname
   sigora_path <- sigora_path[,-4]
@@ -882,34 +740,17 @@ sigora_input <- function(file) {
   return(sigora_path)
 }
 
-# Create a function to read in the lists of Reactome pathways obtained with Sigora
-sigora_input <- function(file) {
-  sigora_path <- read.table(file=file, header=FALSE, sep="\t", quote="", dec=".", na.strings="NA", col.names=c("row", "count",  "weightsum",  "pwyid",  "pwyname",  "p_value",  "adj.p_value",  "round_sum",	"m",	"n",	"k"), fill=TRUE, blank.lines.skip=TRUE, stringsAsFactors=FALSE)
-  sigora_path <- sigora_path[((grep(pattern="TRUE", x=(sigora_path[,2]=="Summary results (based on Reactome):")))+2):((grep(pattern="TRUE", x=(sigora_path[,1]=='[1] "KEGG"')))-4),-1]
-  sigora_path <- sigora_path[complete.cases(sigora_path[,1]),]
-  row.names(sigora_path) <- sigora_path$pwyname
-  sigora_path <- sigora_path[,-4]
-  sigora_path$p_value <- as.numeric(as.character(sigora_path$p_value))
-  sigora_path$adj.p_value <- as.numeric(as.character(sigora_path$adj.p_value))
-  sigora_path <- sigora_path[order(sigora_path$p_value, na.last=TRUE),]
-  sigora_path <- cbind(x=sigora_path, y=rank(sigora_path$adj.p_value, na.last="keep", ties.method="first"))
-  colnames(sigora_path)[10] <- "rank"
-  colnames(sigora_path) <- gsub(pattern="$", replacement="_sigora", x=colnames(sigora_path), perl=TRUE)
-  colnames(sigora_path) <- gsub(pattern="^x.", replacement="", x=colnames(sigora_path), perl=TRUE)
-  return(sigora_path)
-}
-
-# Read in the lists of pathways obtained with Sigora
-Sig_MB2H_novel <- sigora_input(file="./Sigora/Sigora_MB2H(novel).txt")
+# Read in the lists of KEGG pathways obtained with Sigora
+Sig_MB2H_novel <- sigora_input(file="./Sigora/Sigora_MB2H(novel).txt", database="KEGG")
 head(Sig_MB2H_novel)
 dim(Sig_MB2H_novel)
-Sig_MB6H_novel <- sigora_input(file="./Sigora/Sigora_MB6H(novel).txt")
+Sig_MB6H_novel <- sigora_input(file="./Sigora/Sigora_MB6H(novel).txt", database="KEGG")
 head(Sig_MB6H_novel)
 dim(Sig_MB6H_novel)
-Sig_MB24H_novel <- sigora_input(file="./Sigora/Sigora_MB24H(novel).txt")
+Sig_MB24H_novel <- sigora_input(file="./Sigora/Sigora_MB24H(novel).txt", database="KEGG")
 head(Sig_MB24H_novel)
 dim(Sig_MB24H_novel)
-Sig_MB48H_novel <- sigora_input(file="./Sigora/Sigora_MB48H(novel).txt")
+Sig_MB48H_novel <- sigora_input(file="./Sigora/Sigora_MB48H(novel).txt", database="KEGG")
 head(Sig_MB48H_novel)
 dim(Sig_MB48H_novel)
 
@@ -934,7 +775,7 @@ common_path <- function(file1, file2) {
   return(common_path)
 }
 
-# Identify the common significant pathways between Pathway-guide and Sigora
+# Identify the KEGG common significant pathways between Pathway-guide and Sigora
 Pathway_MB2H <- common_path(file1=Path_MB2H_novel, file2=Sig_MB2H_novel)
 head(Pathway_MB2H)
 summary(Pathway_MB2H$significant=="TRUE")
@@ -948,13 +789,66 @@ Pathway_MB48H <- common_path(file1=Path_MB48H_novel, file2=Sig_MB48H_novel)
 head(Pathway_MB48H)
 summary(Pathway_MB48H$significant=="TRUE")
 
-# Output the kegg common pathways
+# Output the KEGG common pathways
 write.table(x=Pathway_MB2H, file="Pathway_MB2H(kegg).txt", sep="\t", quote=FALSE, row.names=TRUE, col.names=TRUE)
 write.table(x=Pathway_MB6H, file="Pathway_MB6H(kegg).txt", sep="\t", quote=FALSE, row.names=TRUE, col.names=TRUE)
 write.table(x=Pathway_MB24H, file="Pathway_MB24H(kegg).txt", sep="\t", quote=FALSE, row.names=TRUE, col.names=TRUE)
 write.table(x=Pathway_MB48H, file="Pathway_MB48H(kegg).txt", sep="\t", quote=FALSE, row.names=TRUE, col.names=TRUE)
 
-# Output the reactome common pathways
+##################################################################################
+# Compare the different Reactome pathways obtained with Sigora and Pathway-guide #
+##################################################################################
+
+# Load required library
+library(gdata)
+
+# Read in the lists of pathways obtained with Pathway-guide from Reactome
+Path_MB2H_novel <- read.xls(xls="C:/Users/nnalpas/Documents/PhD project/Alveolar macrophages/RNA-seq analysis/Results/Pathway-guide/Reactome/Pathway_Sig_MB_sense_2H(novel)/B Cell Activation.xls", sheet=1, header=TRUE, row.names=2, )
+colnames(Path_MB2H_novel) <- gsub(pattern="$", replacement="_Pathguide", x=colnames(Path_MB2H_novel), perl=TRUE)
+head(Path_MB2H_novel)
+dim(Path_MB2H_novel)
+Path_MB6H_novel <- read.xls(xls="C:/Users/nnalpas/Documents/PhD project/Alveolar macrophages/RNA-seq analysis/Results/Pathway-guide/Reactome/Pathway_Sig_MB_sense_6H(novel)/B Cell Activation.xls", sheet=1, header=TRUE, row.names=2)
+colnames(Path_MB6H_novel) <- gsub(pattern="$", replacement="_Pathguide", x=colnames(Path_MB6H_novel), perl=TRUE)
+head(Path_MB6H_novel)
+dim(Path_MB6H_novel)
+Path_MB24H_novel <- read.xls(xls="C:/Users/nnalpas/Documents/PhD project/Alveolar macrophages/RNA-seq analysis/Results/Pathway-guide/Reactome/Pathway_Sig_MB_sense_24H(novel)/B Cell Activation.xls", sheet=1, header=TRUE, row.names=2)
+colnames(Path_MB24H_novel) <- gsub(pattern="$", replacement="_Pathguide", x=colnames(Path_MB24H_novel), perl=TRUE)
+head(Path_MB24H_novel)
+dim(Path_MB24H_novel)
+Path_MB48H_novel <- read.xls(xls="C:/Users/nnalpas/Documents/PhD project/Alveolar macrophages/RNA-seq analysis/Results/Pathway-guide/Reactome/Pathway_Sig_MB_sense_48H(novel)/B Cell Activation.xls", sheet=1, header=TRUE, row.names=2)
+colnames(Path_MB48H_novel) <- gsub(pattern="$", replacement="_Pathguide", x=colnames(Path_MB48H_novel), perl=TRUE)
+head(Path_MB48H_novel)
+dim(Path_MB48H_novel)
+
+# Read in the lists of Reactome pathways obtained with Sigora (using previously defined function: sigora_input)
+Sig_MB2H_novel <- sigora_input(file="./Sigora/Sigora_MB2H(novel).txt", database="Reactome")
+head(Sig_MB2H_novel)
+dim(Sig_MB2H_novel)
+Sig_MB6H_novel <- sigora_input(file="./Sigora/Sigora_MB6H(novel).txt", database="Reactome")
+head(Sig_MB6H_novel)
+dim(Sig_MB6H_novel)
+Sig_MB24H_novel <- sigora_input(file="./Sigora/Sigora_MB24H(novel).txt", database="Reactome")
+head(Sig_MB24H_novel)
+dim(Sig_MB24H_novel)
+Sig_MB48H_novel <- sigora_input(file="./Sigora/Sigora_MB48H(novel).txt", database="Reactome")
+head(Sig_MB48H_novel)
+dim(Sig_MB48H_novel)
+
+# Identify the Reactome common significant pathways between Pathway-guide and Sigora (using previously defined function: common_path)
+Pathway_MB2H <- common_path(file1=Path_MB2H_novel, file2=Sig_MB2H_novel)
+head(Pathway_MB2H)
+summary(Pathway_MB2H$significant=="TRUE")
+Pathway_MB6H <- common_path(file1=Path_MB6H_novel, file2=Sig_MB6H_novel)
+head(Pathway_MB6H)
+summary(Pathway_MB6H$significant=="TRUE")
+Pathway_MB24H <- common_path(file1=Path_MB24H_novel, file2=Sig_MB24H_novel)
+head(Pathway_MB24H)
+summary(Pathway_MB24H$significant=="TRUE")
+Pathway_MB48H <- common_path(file1=Path_MB48H_novel, file2=Sig_MB48H_novel)
+head(Pathway_MB48H)
+summary(Pathway_MB48H$significant=="TRUE")
+
+# Output the Reactome common pathways
 write.table(x=Pathway_MB2H, file="Pathway_MB2H(reactome).txt", sep="\t", quote=FALSE, row.names=TRUE, col.names=TRUE)
 write.table(x=Pathway_MB6H, file="Pathway_MB6H(reactome).txt", sep="\t", quote=FALSE, row.names=TRUE, col.names=TRUE)
 write.table(x=Pathway_MB24H, file="Pathway_MB24H(reactome).txt", sep="\t", quote=FALSE, row.names=TRUE, col.names=TRUE)
