@@ -3,7 +3,7 @@
 #######################################################################
 
 # Set the working directory
-setwd(dir="C:/Users/nnalpas/Documents/PhD project/Alveolar macrophages/RNA-seq analysis/Results/edgeR/Analysis 251113/Overlap")
+setwd(dir="F:/nnalpas/Documents/PhD project/Alveolar macrophages/RNA-seq analysis/Results/edgeR/Analysis 251113/Overlap")
 getwd()
 
 # Read the input sense DEG at the different time points
@@ -250,7 +250,7 @@ library(ggplot2)
 library(grid)
 
 # Plotting of the logFC for antisense and sense data for each gene
-setwd("C:/Users/nnalpas/Documents/PhD project/Alveolar macrophages/RNA-seq analysis/Results/edgeR/Analysis 251113/Overlap/plot_AS_S")
+setwd("F:/nnalpas/Documents/PhD project/Alveolar macrophages/RNA-seq analysis/Results/edgeR/Analysis 251113/Overlap/plot_AS_S")
 getwd()
 not_plotted <- vector()
 for (i in 1:nrow(data)) {
@@ -270,7 +270,7 @@ not_plotted
 length(not_plotted)
 
 # Reset the working directory
-setwd(dir="C:/Users/nnalpas/Documents/PhD project/Alveolar macrophages/RNA-seq analysis/Results/edgeR/Analysis 251113/Overlap")
+setwd(dir="F:/nnalpas/Documents/PhD project/Alveolar macrophages/RNA-seq analysis/Results/edgeR/Analysis 251113/Overlap")
 getwd()
 
 #######

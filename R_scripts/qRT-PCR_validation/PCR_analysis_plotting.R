@@ -7,7 +7,7 @@
 ###############################
 
 # Move to the appropriate folder
-setwd("C:/Users/nnalpas/Documents/PhD project/Alveolar macrophages/RNA-seq analysis/Results/PCR validation/Plotting in R(10_animals)")
+setwd("F:/nnalpas/Documents/PhD project/Alveolar macrophages/RNA-seq analysis/Results/PCR validation/Plotting in R(10_animals)")
 getwd()
 workDir <- getwd()
 workDir
@@ -103,10 +103,6 @@ PCR_vs_RNAseq <- expression_plot(Data_2_plot)
 # Correlation between RNA-seq and PCR #
 #######################################
 
-# Calculate overall correlation between fold-changes obtained with PCR and RNA-seq
-cor(PCR_CNRQ$Mean, RNAseq$Mean, method="pearson")
-cor(PCR_CNRQ$Mean, RNAseq$Mean, method="spearman")
-
 # Filter out the log2 fold-change at 0H from both datasets
 PCR_cor_filt <- grep(pattern="0", x=PCR_CNRQ$Times..H., invert=TRUE)
 PCR_cor_no0 <- PCR_CNRQ[PCR_cor_filt,]
@@ -116,26 +112,26 @@ RNAseq_cor_no0 <- RNAseq[RNAseq_cor_filt,]
 head(RNAseq_cor_no0)
 
 # Calculate correlation between fold-changes obtained with PCR and RNA-seq without time point 0H
-cor(PCR_cor_no0$Mean, RNAseq_cor_no0$Mean, method="pearson")
-cor(PCR_cor_no0$Mean, RNAseq_cor_no0$Mean, method="spearman")
+cor.test(PCR_cor_no0$Mean, RNAseq_cor_no0$Mean, method="pearson")
+cor.test(PCR_cor_no0$Mean, RNAseq_cor_no0$Mean, method="spearman")
 
 # Calculate correlation between fold-changes obtained with PCR and RNA-seq for each gene
-cor(PCR_cor_no0[grep(pattern="CCL4", x=PCR_cor_no0$Samples),"Mean"], RNAseq_cor_no0[grep(pattern="CCL4", x=RNAseq_cor_no0$Samples),"Mean"], method="pearson")
-cor(PCR_cor_no0[grep(pattern="CCL4", x=PCR_cor_no0$Samples),"Mean"], RNAseq_cor_no0[grep(pattern="CCL4", x=RNAseq_cor_no0$Samples),"Mean"], method="spearman")
-cor(PCR_cor_no0[grep(pattern="FOS", x=PCR_cor_no0$Samples),"Mean"], RNAseq_cor_no0[grep(pattern="FOS", x=RNAseq_cor_no0$Samples),"Mean"], method="pearson")
-cor(PCR_cor_no0[grep(pattern="FOS", x=PCR_cor_no0$Samples),"Mean"], RNAseq_cor_no0[grep(pattern="FOS", x=RNAseq_cor_no0$Samples),"Mean"], method="spearman")
-cor(PCR_cor_no0[grep(pattern="IL10", x=PCR_cor_no0$Samples),"Mean"], RNAseq_cor_no0[grep(pattern="IL10", x=RNAseq_cor_no0$Samples),"Mean"], method="pearson")
-cor(PCR_cor_no0[grep(pattern="IL10", x=PCR_cor_no0$Samples),"Mean"], RNAseq_cor_no0[grep(pattern="IL10", x=RNAseq_cor_no0$Samples),"Mean"], method="spearman")
-cor(PCR_cor_no0[grep(pattern="IL1B", x=PCR_cor_no0$Samples),"Mean"], RNAseq_cor_no0[grep(pattern="IL1B", x=RNAseq_cor_no0$Samples),"Mean"], method="pearson")
-cor(PCR_cor_no0[grep(pattern="IL1B", x=PCR_cor_no0$Samples),"Mean"], RNAseq_cor_no0[grep(pattern="IL1B", x=RNAseq_cor_no0$Samples),"Mean"], method="spearman")
-cor(PCR_cor_no0[grep(pattern="IL6", x=PCR_cor_no0$Samples),"Mean"], RNAseq_cor_no0[grep(pattern="IL6", x=RNAseq_cor_no0$Samples),"Mean"], method="pearson")
-cor(PCR_cor_no0[grep(pattern="IL6", x=PCR_cor_no0$Samples),"Mean"], RNAseq_cor_no0[grep(pattern="IL6", x=RNAseq_cor_no0$Samples),"Mean"], method="spearman")
-cor(PCR_cor_no0[grep(pattern="PIK3IP1", x=PCR_cor_no0$Samples),"Mean"], RNAseq_cor_no0[grep(pattern="PIK3IP1", x=RNAseq_cor_no0$Samples),"Mean"], method="pearson")
-cor(PCR_cor_no0[grep(pattern="PIK3IP1", x=PCR_cor_no0$Samples),"Mean"], RNAseq_cor_no0[grep(pattern="PIK3IP1", x=RNAseq_cor_no0$Samples),"Mean"], method="spearman")
-cor(PCR_cor_no0[grep(pattern="TLR2", x=PCR_cor_no0$Samples),"Mean"], RNAseq_cor_no0[grep(pattern="TLR2", x=RNAseq_cor_no0$Samples),"Mean"], method="pearson")
-cor(PCR_cor_no0[grep(pattern="TLR2", x=PCR_cor_no0$Samples),"Mean"], RNAseq_cor_no0[grep(pattern="TLR2", x=RNAseq_cor_no0$Samples),"Mean"], method="spearman")
-cor(PCR_cor_no0[grep(pattern="TNF", x=PCR_cor_no0$Samples),"Mean"], RNAseq_cor_no0[grep(pattern="TNF", x=RNAseq_cor_no0$Samples),"Mean"], method="pearson")
-cor(PCR_cor_no0[grep(pattern="TNF", x=PCR_cor_no0$Samples),"Mean"], RNAseq_cor_no0[grep(pattern="TNF", x=RNAseq_cor_no0$Samples),"Mean"], method="spearman")
+cor.test(PCR_cor_no0[grep(pattern="CCL4", x=PCR_cor_no0$Samples),"Mean"], RNAseq_cor_no0[grep(pattern="CCL4", x=RNAseq_cor_no0$Samples),"Mean"], method="pearson")
+cor.test(PCR_cor_no0[grep(pattern="CCL4", x=PCR_cor_no0$Samples),"Mean"], RNAseq_cor_no0[grep(pattern="CCL4", x=RNAseq_cor_no0$Samples),"Mean"], method="spearman")
+cor.test(PCR_cor_no0[grep(pattern="FOS", x=PCR_cor_no0$Samples),"Mean"], RNAseq_cor_no0[grep(pattern="FOS", x=RNAseq_cor_no0$Samples),"Mean"], method="pearson")
+cor.test(PCR_cor_no0[grep(pattern="FOS", x=PCR_cor_no0$Samples),"Mean"], RNAseq_cor_no0[grep(pattern="FOS", x=RNAseq_cor_no0$Samples),"Mean"], method="spearman")
+cor.test(PCR_cor_no0[grep(pattern="IL10", x=PCR_cor_no0$Samples),"Mean"], RNAseq_cor_no0[grep(pattern="IL10", x=RNAseq_cor_no0$Samples),"Mean"], method="pearson")
+cor.test(PCR_cor_no0[grep(pattern="IL10", x=PCR_cor_no0$Samples),"Mean"], RNAseq_cor_no0[grep(pattern="IL10", x=RNAseq_cor_no0$Samples),"Mean"], method="spearman")
+cor.test(PCR_cor_no0[grep(pattern="IL1B", x=PCR_cor_no0$Samples),"Mean"], RNAseq_cor_no0[grep(pattern="IL1B", x=RNAseq_cor_no0$Samples),"Mean"], method="pearson")
+cor.test(PCR_cor_no0[grep(pattern="IL1B", x=PCR_cor_no0$Samples),"Mean"], RNAseq_cor_no0[grep(pattern="IL1B", x=RNAseq_cor_no0$Samples),"Mean"], method="spearman")
+cor.test(PCR_cor_no0[grep(pattern="IL6", x=PCR_cor_no0$Samples),"Mean"], RNAseq_cor_no0[grep(pattern="IL6", x=RNAseq_cor_no0$Samples),"Mean"], method="pearson")
+cor.test(PCR_cor_no0[grep(pattern="IL6", x=PCR_cor_no0$Samples),"Mean"], RNAseq_cor_no0[grep(pattern="IL6", x=RNAseq_cor_no0$Samples),"Mean"], method="spearman")
+cor.test(PCR_cor_no0[grep(pattern="PIK3IP1", x=PCR_cor_no0$Samples),"Mean"], RNAseq_cor_no0[grep(pattern="PIK3IP1", x=RNAseq_cor_no0$Samples),"Mean"], method="pearson")
+cor.test(PCR_cor_no0[grep(pattern="PIK3IP1", x=PCR_cor_no0$Samples),"Mean"], RNAseq_cor_no0[grep(pattern="PIK3IP1", x=RNAseq_cor_no0$Samples),"Mean"], method="spearman")
+cor.test(PCR_cor_no0[grep(pattern="TLR2", x=PCR_cor_no0$Samples),"Mean"], RNAseq_cor_no0[grep(pattern="TLR2", x=RNAseq_cor_no0$Samples),"Mean"], method="pearson")
+cor.test(PCR_cor_no0[grep(pattern="TLR2", x=PCR_cor_no0$Samples),"Mean"], RNAseq_cor_no0[grep(pattern="TLR2", x=RNAseq_cor_no0$Samples),"Mean"], method="spearman")
+cor.test(PCR_cor_no0[grep(pattern="TNF", x=PCR_cor_no0$Samples),"Mean"], RNAseq_cor_no0[grep(pattern="TNF", x=RNAseq_cor_no0$Samples),"Mean"], method="pearson")
+cor.test(PCR_cor_no0[grep(pattern="TNF", x=PCR_cor_no0$Samples),"Mean"], RNAseq_cor_no0[grep(pattern="TNF", x=RNAseq_cor_no0$Samples),"Mean"], method="spearman")
 
 #######
 # END #

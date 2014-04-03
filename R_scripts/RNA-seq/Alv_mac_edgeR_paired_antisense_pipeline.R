@@ -21,7 +21,7 @@ library(MASS)
 ###############
 
 # Move to the appropriate folder
-setwd("C:/Users/nnalpas/Documents/PhD project/Alveolar macrophages/RNA-seq analysis/Results/edgeR/Analysis 251113/Antisense_gene")
+setwd("F:/nnalpas/Documents/PhD project/Alveolar macrophages/RNA-seq analysis/Results/edgeR/Analysis 251113/Antisense_gene")
 getwd()
 workDir <- getwd()
 workDir
@@ -31,7 +31,7 @@ workDir
 ################################################
 
 # Create vector of all files name
-fileDir <- "C:/Users/nnalpas/Documents/PhD project/Alveolar macrophages/RNA-seq analysis/Results/edgeR/Analysis 251113/Antisense_gene/Counts"
+fileDir <- "F:/nnalpas/Documents/PhD project/Alveolar macrophages/RNA-seq analysis/Results/edgeR/Analysis 251113/Antisense_gene/Counts"
 files <- list.files(path=fileDir, pattern="*(2|6|24|48)H$", all.files=FALSE, full.names=FALSE, recursive=FALSE, ignore.case=FALSE)
 files
 
@@ -140,7 +140,7 @@ dev.off()
 ##########################################################################
 
 # Create vector of all files name
-fileDir <- "C:/Users/nnalpas/Documents/PhD project/Alveolar macrophages/RNA-seq analysis/Results/edgeR/Analysis 251113/Antisense_gene/ratio_sense"
+fileDir <- "F:/nnalpas/Documents/PhD project/Alveolar macrophages/RNA-seq analysis/Results/edgeR/Analysis 251113/Antisense_gene/ratio_sense"
 files <- list.files(path=fileDir, pattern="*(2|6|24|48)H$", all.files=FALSE, full.names=FALSE, recursive=FALSE, ignore.case=FALSE)
 files
 
@@ -151,7 +151,7 @@ head(sense_gene)
 dim(sense_gene)
 
 # Create vector of all files name
-fileDir <- "C:/Users/nnalpas/Documents/PhD project/Alveolar macrophages/RNA-seq analysis/Results/edgeR/Analysis 251113/Antisense_gene/ratio_antisense"
+fileDir <- "F:/nnalpas/Documents/PhD project/Alveolar macrophages/RNA-seq analysis/Results/edgeR/Analysis 251113/Antisense_gene/ratio_antisense"
 files <- list.files(path=fileDir, pattern="*(2|6|24|48)H$", all.files=FALSE, full.names=FALSE, recursive=FALSE, ignore.case=FALSE)
 files
 

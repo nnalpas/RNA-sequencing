@@ -19,7 +19,7 @@ library(flowCore)
 library(flowViz)
 
 # Set the path to working directory
-setwd(dir="C:/Users/Nicolas Nalpas/Documents/PhD project/Alveolar macrophages/MB-TB infection (Mar-Jun2012)/Flow cytometry/R analysis")
+setwd(dir="F:/nnalpas/Documents/PhD project/Alveolar macrophages/MB-TB infection (Mar-Jun2012)/Flow cytometry/R analysis")
 getwd()
 
 ####################################
@@ -27,11 +27,11 @@ getwd()
 ####################################
 
 # Create a vector of all fcs files
-files <- list.files(path="C:/Users/Nicolas Nalpas/Documents/PhD project/Alveolar macrophages/MB-TB infection (Mar-Jun2012)/Flow cytometry/R analysis/files")
+files <- list.files(path="F:/nnalpas/Documents/PhD project/Alveolar macrophages/MB-TB infection (Mar-Jun2012)/Flow cytometry/R analysis/files")
 files <- grep(x=files, pattern="N.*((St)|(Se)|(Un)).*.fcs", perl=TRUE, value=TRUE)
 
 # Read all the files into a flowframe
-alv_mac <- read.flowSet(files=files, path="C:/Users/Nicolas Nalpas/Documents/PhD project/Alveolar macrophages/MB-TB infection (Mar-Jun2012)/Flow cytometry/R analysis/files")
+alv_mac <- read.flowSet(files=files, path="F:/nnalpas/Documents/PhD project/Alveolar macrophages/MB-TB infection (Mar-Jun2012)/Flow cytometry/R analysis/files")
 pData(phenoData(alv_mac))
 
 # Check data
