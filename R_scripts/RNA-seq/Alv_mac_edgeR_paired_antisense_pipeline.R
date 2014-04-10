@@ -588,113 +588,55 @@ sqrt(Alv_disp$common.dispersion)
 Alv_fit <- glmFit(y=Alv_disp, design=design, )
 names(Alv_fit)
 
-##########################################
-# Differential expression call MB2H-CN2H #
-##########################################
+################################
+# Differential expression call #
+################################
 
-# Carry out the likeli-hood ratio test
-Alv_lrt_MB.2H <- glmLRT(glmfit=Alv_fit, contrast=c(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, 0, 0, 0, 1, 0, 0))
-names(Alv_lrt_MB.2H)
-Alv_lrt_MB.2H$comparison
-head(Alv_lrt_MB.2H$table)
+# Create a function to perform the differential expression within edgeR according to provided parameters
+diff_expr_edgeR <- function(treat1, treat2, data, design, group, adjpvalue, method, LRTdata, DEdata, DEfile, Smearfile) {
+  if(length(grep(pattern=treat1, x=colnames(design)))==1 && length(grep(pattern=treat2, x=colnames(design)))==1) {
+    contr <- rep(x=0, times=length(colnames(design)))
+    contr[c(grep(pattern=treat1, x=colnames(design)), grep(pattern=treat2, x=colnames(design)))] <- c(1, -1)
+    lrt <- glmLRT(glmfit=data, contrast=contr)
+  }
+  else if(length(grep(pattern=treat1, x=colnames(design)))==0 && length(grep(pattern=treat1, x=levels(group)))==1) {
+    contr <- grep(pattern=treat2, x=colnames(design))
+    lrt <- glmLRT(glmfit=data, coef=contr)
+  }
+  else if(length(grep(pattern=treat2, x=colnames(design)))==0 && length(grep(pattern=treat2, x=levels(group)))==1) {
+    contr <- grep(pattern=treat1, x=colnames(design))
+    lrt <- glmLRT(glmfit=data, coef=contr)
+  }
+  else {
+    stop("Error: Check that the treatments provided are in group table!")
+  }
+  de <- topTags(object=lrt, n="inf", adjust.method=method)
+  print("Names of the edgeR likeli-hood ratio test dataframe:")
+  print(names(lrt))
+  print("Comparison perfomed in the edgeR likeli-hood ratio test:")
+  print(lrt$comparison)
+  print("Heading of the edgeR likeli-hood ratio test dataframe:")
+  print(head(lrt$table))
+  print("Summary of the number od edgeR DEG:")
+  print(summary(decideTestsDGE(lrt, p.value=adjpvalue)))
+  print("Names of the edgeR multiple correction test dataframe:")
+  print(names(de))
+  print("Heading of the edgeR multiple correction test dataframe:")
+  print(head(de$table))
+  write.table(x=de$table[,c("sense_ensembl_gene_id", "external_gene_id","description","logFC", "logCPM", "LR", "PValue", "FDR")], file=paste(DEfile, "txt", sep="."), sep="\t", quote=FALSE, row.names=TRUE, col.names=TRUE)
+  png(filename=paste(Smearfile, "png", sep="."), width=1366, height=768, units="px")
+  plotSmear(object=lrt, de.tags=(rownames(lrt$table)[as.logical(decideTestsDGE(lrt, p.value = 0.05))]))
+  abline(h=c(-1, 1), col="blue")
+  dev.off()
+  assign(x=LRTdata, value=lrt, envir=.GlobalEnv)
+  assign(x=DEdata, value=de, envir=.GlobalEnv)
+}
 
-# Summarise the number of up- and down-regulated genes
-summary(decideTestsDGE(Alv_lrt_MB.2H, p.value = 0.05))
-
-# Ajust for multiple testing
-DE_MB.2H <- topTags(Alv_lrt_MB.2H, n="inf", adjust.method="BH")
-names(DE_MB.2H)
-head(DE_MB.2H$table)
-
-# Output data
-write.table(x=DE_MB.2H$table[,c(1:3,10:14)], file="DE_antisense_MB_2H.txt", sep="\t", quote=FALSE, row.names=FALSE, col.names=TRUE)
-
-# Plot the FC versus CPM per tagwise
-png(filename="Smear_FC_CPM_MB.2H.png", width=1366, height=768, units="px")
-plotSmear(object=Alv_lrt_MB.2H, de.tags=(rownames(Alv_lrt_MB.2H$table)[as.logical(decideTestsDGE(Alv_lrt_MB.2H, p.value = 0.05))]))
-abline(h=c(-1, 1), col="blue")
-dev.off()
-
-##########################################
-# Differential expression call MB6H-CN6H #
-##########################################
-
-# Carry out the likeli-hood ratio test
-Alv_lrt_MB.6H <- glmLRT(glmfit=Alv_fit, contrast=c(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, 0, 0, 0, 1))
-names(Alv_lrt_MB.6H)
-Alv_lrt_MB.6H$comparison
-head(Alv_lrt_MB.6H$table)
-
-# Summarise the number of up- and down-regulated genes
-summary(decideTestsDGE(Alv_lrt_MB.6H, p.value = 0.05))
-
-# Ajust for multiple testing
-DE_MB.6H <- topTags(Alv_lrt_MB.6H, n="inf", adjust.method="BH")
-names(DE_MB.6H)
-head(DE_MB.6H$table)
-
-# Output data
-write.table(x=DE_MB.6H$table[,c(1:3,10:14)], file="DE_antisense_MB_6H.txt", sep="\t", quote=FALSE, row.names=FALSE, col.names=TRUE)
-
-# Plot the FC versus CPM per tagwise
-png(filename="Smear_FC_CPM_MB.6H.png", width=1366, height=768, units="px")
-plotSmear(object=Alv_lrt_MB.6H, de.tags=(rownames(Alv_lrt_MB.6H$table)[as.logical(decideTestsDGE(Alv_lrt_MB.6H, p.value = 0.05))]))
-abline(h=c(-1, 1), col="blue")
-dev.off()
-
-############################################
-# Differential expression call MB24H-CN24H #
-############################################
-
-# Carry out the likeli-hood ratio test
-Alv_lrt_MB.24H <- glmLRT(glmfit=Alv_fit, coef=14)
-names(Alv_lrt_MB.24H)
-Alv_lrt_MB.24H$comparison
-head(Alv_lrt_MB.24H$table)
-
-# Summarise the number of up- and down-regulated genes
-summary(decideTestsDGE(Alv_lrt_MB.24H, p.value = 0.05))
-
-# Ajust for multiple testing
-DE_MB.24H <- topTags(Alv_lrt_MB.24H, n="inf", adjust.method="BH")
-names(DE_MB.24H)
-head(DE_MB.24H$table)
-
-# Output data
-write.table(x=DE_MB.24H$table[,c(1:3,10:14)], file="DE_antisense_MB_24H.txt", sep="\t", quote=FALSE, row.names=FALSE, col.names=TRUE)
-
-# Plot the FC versus CPM per tagwise
-png(filename="Smear_FC_CPM_MB.24H.png", width=1366, height=768, units="px")
-plotSmear(object=Alv_lrt_MB.24H, de.tags=(rownames(Alv_lrt_MB.24H$table)[as.logical(decideTestsDGE(Alv_lrt_MB.24H, p.value = 0.05))]))
-abline(h=c(-1, 1), col="blue")
-dev.off()
-
-############################################
-# Differential expression call MB48H-CN48H #
-############################################
-
-# Carry out the likeli-hood ratio test
-Alv_lrt_MB.48H <- glmLRT(glmfit=Alv_fit, contrast=c(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, 0, 0, 0, 1, 0))
-names(Alv_lrt_MB.48H)
-Alv_lrt_MB.48H$comparison
-head(Alv_lrt_MB.48H$table)
-
-# Summarise the number of up- and down-regulated genes
-summary(decideTestsDGE(Alv_lrt_MB.48H, p.value = 0.05))
-
-# Ajust for multiple testing
-DE_MB.48H <- topTags(Alv_lrt_MB.48H, n="inf", adjust.method="BH")
-names(DE_MB.48H)
-head(DE_MB.48H$table)
-
-# Output data
-write.table(x=DE_MB.48H$table[,c(1:3,10:14)], file="DE_antisense_MB_48H.txt", sep="\t", quote=FALSE, row.names=FALSE, col.names=TRUE)
-
-# Plot the FC versus CPM per tagwise
-png(filename="Smear_FC_CPM_MB.48H.png", width=1366, height=768, units="px")
-plotSmear(object=Alv_lrt_MB.48H, de.tags=(rownames(Alv_lrt_MB.48H$table)[as.logical(decideTestsDGE(Alv_lrt_MB.48H, p.value = 0.05))]))
-abline(h=c(-1, 1), col="blue")
-dev.off()
+# Test for differential expression between the different time points/treatments
+diff_expr_edgeR(treat1="MB.2H", treat2="CN.2H", data=Alv_fit, design=design, group=group, adjpvalue=0.05, method="BH", LRTdata="Alv_lrt_MB.2H", DEdata="DE_MB.2H", DEfile="DE_MB_antisense.2H", Smearfile="Smear_FC_CPM_MB.2H")
+diff_expr_edgeR(treat1="MB.6H", treat2="CN.6H", data=Alv_fit, design=design, group=group, adjpvalue=0.05, method="BH", LRTdata="Alv_lrt_MB.6H", DEdata="DE_MB.6H", DEfile="DE_MB_antisense.6H", Smearfile="Smear_FC_CPM_MB.6H")
+diff_expr_edgeR(treat1="MB.24H", treat2="CN.24H", data=Alv_fit, design=design, group=group, adjpvalue=0.05, method="BH", LRTdata="Alv_lrt_MB.24H", DEdata="DE_MB.24H", DEfile="DE_MB_antisense.24H", Smearfile="Smear_FC_CPM_MB.24H")
+diff_expr_edgeR(treat1="MB.48H", treat2="CN.48H", data=Alv_fit, design=design, group=group, adjpvalue=0.05, method="BH", LRTdata="Alv_lrt_MB.48H", DEdata="DE_MB.48H", DEfile="DE_MB_antisense.48H", Smearfile="Smear_FC_CPM_MB.48H")
 
 #########################################################
 # Merge all DE call data from the different time points #
