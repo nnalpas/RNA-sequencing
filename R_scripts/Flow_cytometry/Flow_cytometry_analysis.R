@@ -2,21 +2,42 @@
 # Analysis of alveolar macrophages flow cytometry data #
 ########################################################
 
+#############################
+# List of required packages #
+#############################
+
+# Create a function to load or install (then load) the required packages
+loadpackage <- function(package) {
+  if (require(package=deparse(substitute(package)), character.only=TRUE, quietly=TRUE)) {
+    print(paste(deparse(substitute(package)), " is loaded correctly!", sep=""))
+  }
+  else {
+    print(paste("Trying to install ", deparse(substitute(package)), sep=""))
+    install.packages(pkgs=deparse(substitute(package)), quiet=TRUE)
+    if(require(package=deparse(substitute(package)), character.only=TRUE, quietly=TRUE)) {
+      print(paste(deparse(substitute(package)), " is correctly installed and loaded from CRAN!", sep=""))
+    }
+    else {
+      source(file="http://bioconductor.org/biocLite.R", verbose=FALSE)
+      biocLite(pkgs=deparse(substitute(package)), suppressUpdates=TRUE)
+      if(require(package=deparse(substitute(package)), character.only=TRUE, quietly=TRUE)) {
+        print(paste(deparse(substitute(package)), " is correctly installed and loaded from Bioconductor!", sep=""))
+      }
+      else {
+        stop(paste('"', "Could not install ", deparse(substitute(package)), '"', sep=""))
+      }
+    }
+  }
+  print(paste(deparse(substitute(package)), " version: ", packageVersion(pkg=deparse(substitute(package))), sep=""))
+}
+
+# Load the required packages
+loadpackage(package=flowCore)
+loadpackage(package=flowViz)
+
 ###############################
 # Prepare working environment #
 ###############################
-
-# Download and install required library flowCore (to be performed only once)
-#source("http://bioconductor.org/biocLite.R")
-#biocLite("flowCore")
-
-# Download and install required library flowViz (to be performed only once)
-#source("http://bioconductor.org/biocLite.R")
-#biocLite("flowViz")
-
-# Load required libraries
-library(flowCore)
-library(flowViz)
 
 # Set the path to working directory
 setwd(dir="F:/nnalpas/Documents/PhD project/Alveolar macrophages/MB-TB infection (Mar-Jun2012)/Flow cytometry/R analysis")

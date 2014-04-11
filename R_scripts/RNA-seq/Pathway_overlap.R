@@ -2,6 +2,39 @@
 # Pathway analyses of sense-novel gene counts (paired data) #
 #############################################################
 
+#############################
+# List of required packages #
+#############################
+
+# Create a function to load or install (then load) the required packages
+loadpackage <- function(package) {
+  if (require(package=deparse(substitute(package)), character.only=TRUE, quietly=TRUE)) {
+    print(paste(deparse(substitute(package)), " is loaded correctly!", sep=""))
+  }
+  else {
+    print(paste("Trying to install ", deparse(substitute(package)), sep=""))
+    install.packages(pkgs=deparse(substitute(package)), quiet=TRUE)
+    if(require(package=deparse(substitute(package)), character.only=TRUE, quietly=TRUE)) {
+      print(paste(deparse(substitute(package)), " is correctly installed and loaded from CRAN!", sep=""))
+    }
+    else {
+      source(file="http://bioconductor.org/biocLite.R", verbose=FALSE)
+      biocLite(pkgs=deparse(substitute(package)), suppressUpdates=TRUE)
+      if(require(package=deparse(substitute(package)), character.only=TRUE, quietly=TRUE)) {
+        print(paste(deparse(substitute(package)), " is correctly installed and loaded from Bioconductor!", sep=""))
+      }
+      else {
+        stop(paste('"', "Could not install ", deparse(substitute(package)), '"', sep=""))
+      }
+    }
+  }
+  print(paste(deparse(substitute(package)), " version: ", packageVersion(pkg=deparse(substitute(package))), sep=""))
+}
+
+# Load the required packages
+loadpackage(package=gdata)
+loadpackage(package=sigora)
+
 #####################################################
 # Bovine gene annotation by orthology to H. sapiens #
 #####################################################
@@ -182,8 +215,6 @@ head(ortholog_novel_DE_MB_48H)
 
 # Create a function to perform Sigora analysis based on user-defined parameters (this function can take the bovine ID and transform them in human ID)
 sigora_analysis <- function(input, fdr, logfc, direction, output) {
-  # Load the library Sigora
-  library(sigora)
   # Output parameters of the analysis
   write.table(x=paste("Sigora analysis on input: ", deparse(substitute(input)), " with gene below FDR: ", fdr, " and direction of expression: ", direction, " of ", logfc, "log fold-change."), file=output, sep="\t", quote=FALSE, row.names=TRUE, col.names=TRUE, append=TRUE)
   # Create the list of target gene according to user specified parameters
@@ -245,8 +276,6 @@ sigora <- sigora_analysis(input=DE_MB.48H, fdr=0.001, logfc=0, direction="all", 
 
 # Create a function to perform Sigora analysis based on user-defined parameters (this function takes human ID only)
 sigora_analysis_human <- function(input, fdr, logfc, direction, output) {
-  # Load the library Sigora
-  library(sigora)
   # Output parameters of the analysis
   write.table(x=paste("Sigora analysis on input: ", deparse(substitute(input)), " with gene below FDR: ", fdr, " and direction of expression: ", direction, " of ", logfc, "log fold-change."), file=output, sep="\t", quote=FALSE, row.names=TRUE, col.names=TRUE, append=TRUE)
   # Create the list of target gene according to user specified parameters
@@ -336,9 +365,6 @@ write.table(x=ortholog_novel_DE, file="DE_MB_sense_novel(Hsapiens).txt", sep="\t
 ##############################################################################
 # Compare the different KEGG pathways obtained with Sigora and Pathway-guide #
 ##############################################################################
-
-# Load required library
-library(gdata)
 
 # Read in the lists of pathways obtained with Pathway-guide from KEGG
 Path_MB2H_novel <- read.xls(xls="F:/nnalpas/Documents/PhD project/Alveolar macrophages/RNA-seq analysis/Results/Pathway-guide/KEGG/Pathway_Sig_MB_sense_2H(novel)/Adipocytokine signaling pathway.xls", sheet=1, header=TRUE, row.names=2, )
@@ -441,9 +467,6 @@ write.table(x=Pathway_MB48H, file="Pathway_MB48H(kegg).txt", sep="\t", quote=FAL
 ##################################################################################
 # Compare the different Reactome pathways obtained with Sigora and Pathway-guide #
 ##################################################################################
-
-# Load required library
-library(gdata)
 
 # Read in the lists of pathways obtained with Pathway-guide from Reactome
 Path_MB2H_novel <- read.xls(xls="F:/nnalpas/Documents/PhD project/Alveolar macrophages/RNA-seq analysis/Results/Pathway-guide/Reactome/Pathway_Sig_MB_sense_2H(novel)/B Cell Activation.xls", sheet=1, header=TRUE, row.names=2, )

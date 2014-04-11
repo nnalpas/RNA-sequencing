@@ -2,6 +2,43 @@
 # Compare the list of differentially expressed genes between datasets #
 #######################################################################
 
+#############################
+# List of required packages #
+#############################
+
+# Create a function to load or install (then load) the required packages
+loadpackage <- function(package) {
+  if (require(package=deparse(substitute(package)), character.only=TRUE, quietly=TRUE)) {
+    print(paste(deparse(substitute(package)), " is loaded correctly!", sep=""))
+  }
+  else {
+    print(paste("Trying to install ", deparse(substitute(package)), sep=""))
+    install.packages(pkgs=deparse(substitute(package)), quiet=TRUE)
+    if(require(package=deparse(substitute(package)), character.only=TRUE, quietly=TRUE)) {
+      print(paste(deparse(substitute(package)), " is correctly installed and loaded from CRAN!", sep=""))
+    }
+    else {
+      source(file="http://bioconductor.org/biocLite.R", verbose=FALSE)
+      biocLite(pkgs=deparse(substitute(package)), suppressUpdates=TRUE)
+      if(require(package=deparse(substitute(package)), character.only=TRUE, quietly=TRUE)) {
+        print(paste(deparse(substitute(package)), " is correctly installed and loaded from Bioconductor!", sep=""))
+      }
+      else {
+        stop(paste('"', "Could not install ", deparse(substitute(package)), '"', sep=""))
+      }
+    }
+  }
+  print(paste(deparse(substitute(package)), " version: ", packageVersion(pkg=deparse(substitute(package))), sep=""))
+}
+
+# Load the required packages
+loadpackage(package=ggplot2)
+loadpackage(package=grid)
+
+###############
+# Preparation #
+###############
+
 # Set the working directory
 setwd(dir="F:/nnalpas/Documents/PhD project/Alveolar macrophages/RNA-seq analysis/Results/edgeR/Analysis 251113/Overlap")
 getwd()
@@ -244,10 +281,6 @@ sig_label <- function(arg1) {
 }
 data_2_plot <- sig_label(data_2_plot)
 head(data_2_plot)
-
-# Load required package for plotting
-library(ggplot2)
-library(grid)
 
 # Plotting of the logFC for antisense and sense data for each gene
 setwd("F:/nnalpas/Documents/PhD project/Alveolar macrophages/RNA-seq analysis/Results/edgeR/Analysis 251113/Overlap/plot_AS_S")
