@@ -6,30 +6,8 @@
 # List of required packages #
 #############################
 
-# Create a function to load or install (then load) the required packages
-loadpackage <- function(package) {
-  if (require(package=deparse(substitute(package)), character.only=TRUE, quietly=TRUE)) {
-    print(paste(deparse(substitute(package)), " is loaded correctly!", sep=""))
-  }
-  else {
-    print(paste("Trying to install ", deparse(substitute(package)), sep=""))
-    install.packages(pkgs=deparse(substitute(package)), quiet=TRUE)
-    if(require(package=deparse(substitute(package)), character.only=TRUE, quietly=TRUE)) {
-      print(paste(deparse(substitute(package)), " is correctly installed and loaded from CRAN!", sep=""))
-    }
-    else {
-      source(file="http://bioconductor.org/biocLite.R", verbose=FALSE)
-      biocLite(pkgs=deparse(substitute(package)), suppressUpdates=TRUE)
-      if(require(package=deparse(substitute(package)), character.only=TRUE, quietly=TRUE)) {
-        print(paste(deparse(substitute(package)), " is correctly installed and loaded from Bioconductor!", sep=""))
-      }
-      else {
-        stop(paste('"', "Could not install ", deparse(substitute(package)), '"', sep=""))
-      }
-    }
-  }
-  print(paste(deparse(substitute(package)), " version: ", packageVersion(pkg=deparse(substitute(package))), sep=""))
-}
+# Source the common functions used across this script
+source(file="F:/nnalpas/Documents/PhD project/Bioinformatics/R/General_function.R")
 
 # Load the required packages
 loadpackage(package=ggplot2)
@@ -260,26 +238,7 @@ head(data_2_plot)
 dim(data_2_plot)
 
 # Add significance label
-sig_label <- function(arg1) {
-  Significance_label <- vector()
-  for (j in 1:length(arg1$FDR)) {
-    if (arg1$FDR[j] < 0.001) {
-      Significance_label <- c(Significance_label, "***")
-    }
-    else if (arg1$FDR[j] < 0.01) {
-      Significance_label <- c(Significance_label, "**")
-    }
-    else if (arg1$FDR[j] < 0.05) {
-      Significance_label <- c(Significance_label, "*")
-    }
-    else {
-      Significance_label <- c(Significance_label, "")
-    }
-  }
-  arg1 <- cbind(arg1, Significance_label)
-  return(arg1)
-}
-data_2_plot <- sig_label(data_2_plot)
+data_2_plot <- sig_label(arg1=data_2_plot , arg2="FDR")
 head(data_2_plot)
 
 # Plotting of the logFC for antisense and sense data for each gene

@@ -6,30 +6,8 @@
 # List of required packages #
 #############################
 
-# Create a function to load or install (then load) the required packages
-loadpackage <- function(package) {
-  if (require(package=deparse(substitute(package)), character.only=TRUE, quietly=TRUE)) {
-    print(paste(deparse(substitute(package)), " is loaded correctly!", sep=""))
-  }
-  else {
-    print(paste("Trying to install ", deparse(substitute(package)), sep=""))
-    install.packages(pkgs=deparse(substitute(package)), quiet=TRUE)
-    if(require(package=deparse(substitute(package)), character.only=TRUE, quietly=TRUE)) {
-      print(paste(deparse(substitute(package)), " is correctly installed and loaded from CRAN!", sep=""))
-    }
-    else {
-      source(file="http://bioconductor.org/biocLite.R", verbose=FALSE)
-      biocLite(pkgs=deparse(substitute(package)), suppressUpdates=TRUE)
-      if(require(package=deparse(substitute(package)), character.only=TRUE, quietly=TRUE)) {
-        print(paste(deparse(substitute(package)), " is correctly installed and loaded from Bioconductor!", sep=""))
-      }
-      else {
-        stop(paste('"', "Could not install ", deparse(substitute(package)), '"', sep=""))
-      }
-    }
-  }
-  print(paste(deparse(substitute(package)), " version: ", packageVersion(pkg=deparse(substitute(package))), sep=""))
-}
+# Source the common functions used across this script
+source(file="F:/nnalpas/Documents/PhD project/Bioinformatics/R/General_function.R")
 
 # Load the required packages
 loadpackage(package=ggplot2)
@@ -70,28 +48,9 @@ PCR_CNRQ[grep(pattern="0", x=PCR_CNRQ$Times..H., invert=TRUE),"Adj.p.value"] <- 
 PCR_CNRQ$Adj.p.value
 
 # Add significance label
-sig_label <- function(arg1) {
-  Significance_label <- vector()
-  for (j in 1:length(arg1$Adj.p.value)) {
-    if (arg1$Adj.p.value[j] < 0.001) {
-      Significance_label <- c(Significance_label, "***")
-    }
-    else if (arg1$Adj.p.value[j] < 0.01) {
-      Significance_label <- c(Significance_label, "**")
-    }
-    else if (arg1$Adj.p.value[j] < 0.05) {
-      Significance_label <- c(Significance_label, "*")
-    }
-    else {
-      Significance_label <- c(Significance_label, "")
-    }
-  }
-  arg1 <- cbind(arg1, Significance_label)
-  return(arg1)
-}
-PCR_CNRQ <- sig_label(PCR_CNRQ)
+PCR_CNRQ <- sig_label(arg1=PCR_CNRQ, arg2="Adj.p.value")
 head(PCR_CNRQ)
-RNAseq <- sig_label(RNAseq)
+RNAseq <- sig_label(arg1=RNAseq, arg2="Adj.p.value")
 head(RNAseq)
 
 # Bind together the PCR and RNA-seq data

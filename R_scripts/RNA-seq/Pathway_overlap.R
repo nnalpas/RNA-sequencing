@@ -6,30 +6,8 @@
 # List of required packages #
 #############################
 
-# Create a function to load or install (then load) the required packages
-loadpackage <- function(package) {
-  if (require(package=deparse(substitute(package)), character.only=TRUE, quietly=TRUE)) {
-    print(paste(deparse(substitute(package)), " is loaded correctly!", sep=""))
-  }
-  else {
-    print(paste("Trying to install ", deparse(substitute(package)), sep=""))
-    install.packages(pkgs=deparse(substitute(package)), quiet=TRUE)
-    if(require(package=deparse(substitute(package)), character.only=TRUE, quietly=TRUE)) {
-      print(paste(deparse(substitute(package)), " is correctly installed and loaded from CRAN!", sep=""))
-    }
-    else {
-      source(file="http://bioconductor.org/biocLite.R", verbose=FALSE)
-      biocLite(pkgs=deparse(substitute(package)), suppressUpdates=TRUE)
-      if(require(package=deparse(substitute(package)), character.only=TRUE, quietly=TRUE)) {
-        print(paste(deparse(substitute(package)), " is correctly installed and loaded from Bioconductor!", sep=""))
-      }
-      else {
-        stop(paste('"', "Could not install ", deparse(substitute(package)), '"', sep=""))
-      }
-    }
-  }
-  print(paste(deparse(substitute(package)), " version: ", packageVersion(pkg=deparse(substitute(package))), sep=""))
-}
+# Source the common functions used across this script
+source(file="F:/nnalpas/Documents/PhD project/Bioinformatics/R/General_function.R")
 
 # Load the required packages
 loadpackage(package=gdata)
@@ -213,67 +191,6 @@ head(ortholog_novel_DE_MB_48H)
 # Use of Sigora for over-representation of gene-pair signatures in pathways #
 #############################################################################
 
-# Create a function to perform Sigora analysis based on user-defined parameters (this function can take the bovine ID and transform them in human ID)
-sigora_analysis <- function(input, fdr, logfc, direction, output) {
-  # Output parameters of the analysis
-  write.table(x=paste("Sigora analysis on input: ", deparse(substitute(input)), " with gene below FDR: ", fdr, " and direction of expression: ", direction, " of ", logfc, "log fold-change."), file=output, sep="\t", quote=FALSE, row.names=TRUE, col.names=TRUE, append=TRUE)
-  # Create the list of target gene according to user specified parameters
-  if (direction == "up") {
-    target <- input$table[(input$table$FDR < fdr),]
-    target <- rownames(target[(target$logFC > logfc),])
-  }
-  else if (direction == "down") {
-    target <- input$table[(input$table$FDR < fdr),]
-    target <- rownames(target[(target$logFC < logfc),])
-  }
-  else if (direction == "all") {
-    target <- input$table[(input$table$FDR < fdr),]
-    target <- rownames(target[((target$logFC > logfc) || (target$logFC < logfc)),])
-  }
-  target <- as.matrix(target)
-  colnames(target) <- "ensembl_gene_id"
-  write.table(x=paste("Number of bovine target genes: ", length(target)), file=output, sep="\t", quote=FALSE, row.names=TRUE, col.names=TRUE, append=TRUE)
-  # Obtain the human gene ID for the target bovine gene
-  homo_id <- merge(x=target, y=human_ortholog, by="ensembl_gene_id")
-  homo_id <- as.vector(homo_id[,-1])
-  write.table(x=paste("Number of human ortholog target genes: ", length(homo_id)), file=output, sep="\t", quote=FALSE, row.names=TRUE, col.names=TRUE, append=TRUE)
-  # Convert human gene ID to Sigora ID for analysis purpose
-  sig_id <<- ens_converter(homo_id)
-  write.table(x=paste("Number of Sigora corresponding ID: ", length(sig_id)), file=output, sep="\t", quote=FALSE, row.names=TRUE, col.names=TRUE, append=TRUE)
-  write.table(x="------------------------------------------------------------------------------------------------------------------------------------------------------", file=output, sep="\t", quote=FALSE, row.names=TRUE, col.names=TRUE, append=TRUE)
-  # Perform Sigora pathway analysis using Reactome database and outpout results
-  sink(file=output, append=TRUE, split=TRUE)
-  sigs(samplename=sig_id, archive="R", markers=1, level=4)
-  sink()
-  write.table(x="Summary results (based on Reactome):", file=output, sep="\t", quote=FALSE, row.names=TRUE, col.names=TRUE, append=TRUE)
-  write.table(x=summary_results, file=output, sep="\t", quote=FALSE, row.names=TRUE, col.names=TRUE, append=TRUE)
-  write.table(x="------------------------------------------------------------------------------------------------------------------------------------------------------", file=output, sep="\t", quote=FALSE, row.names=TRUE, col.names=TRUE, append=TRUE)
-  # Perform Sigora pathway analysis using Kegg database and outpout results
-  sink(file=output, append=TRUE, split=TRUE)
-  sigs(samplename=sig_id, archive="k", markers=1, level=2)
-  sink()
-  write.table(x="Summary results (based on Kegg):", file=output, sep="\t", quote=FALSE, row.names=TRUE, col.names=TRUE, append=TRUE)
-  write.table(x=summary_results, file=output, sep="\t", quote=FALSE, row.names=TRUE, col.names=TRUE, append=TRUE)
-}
-
-# Perform Sigora analysis using different parameters
-sigora <- sigora_analysis(input=DE_MB.2H, fdr=0.05, logfc=0, direction="up", output="Sigora_Up_MB2H.txt")
-sigora <- sigora_analysis(input=DE_MB.2H, fdr=0.05, logfc=0, direction="down", output="Sigora_Down_MB2H.txt")
-sigora <- sigora_analysis(input=DE_MB.2H, fdr=0.05, logfc=0, direction="all", output="Sigora_MB2H.txt")
-sigora <- sigora_analysis(input=DE_MB.2H, fdr=0.001, logfc=0, direction="all", output="Sigora_fdr0.001_MB2H.txt")
-sigora <- sigora_analysis(input=DE_MB.6H, fdr=0.05, logfc=0, direction="up", output="Sigora_Up_MB6H.txt")
-sigora <- sigora_analysis(input=DE_MB.6H, fdr=0.05, logfc=0, direction="down", output="Sigora_Down_MB6H.txt")
-sigora <- sigora_analysis(input=DE_MB.6H, fdr=0.05, logfc=0, direction="all", output="Sigora_MB6H.txt")
-sigora <- sigora_analysis(input=DE_MB.6H, fdr=0.001, logfc=0, direction="all", output="Sigora_fdr0.001_MB6H.txt")
-sigora <- sigora_analysis(input=DE_MB.24H, fdr=0.05, logfc=0, direction="up", output="Sigora_Up_MB24H.txt")
-sigora <- sigora_analysis(input=DE_MB.24H, fdr=0.05, logfc=0, direction="down", output="Sigora_Down_MB24H.txt")
-sigora <- sigora_analysis(input=DE_MB.24H, fdr=0.05, logfc=0, direction="all", output="Sigora_MB24H.txt")
-sigora <- sigora_analysis(input=DE_MB.24H, fdr=0.001, logfc=0, direction="all", output="Sigora_fdr0.001_MB24H.txt")
-sigora <- sigora_analysis(input=DE_MB.48H, fdr=0.05, logfc=0, direction="up", output="Sigora_Up_MB48H.txt")
-sigora <- sigora_analysis(input=DE_MB.48H, fdr=0.05, logfc=0, direction="down", output="Sigora_Down_MB48H.txt")
-sigora <- sigora_analysis(input=DE_MB.48H, fdr=0.05, logfc=0, direction="all", output="Sigora_MB48H.txt")
-sigora <- sigora_analysis(input=DE_MB.48H, fdr=0.001, logfc=0, direction="all", output="Sigora_fdr0.001_MB48H.txt")
-
 # Create a function to perform Sigora analysis based on user-defined parameters (this function takes human ID only)
 sigora_analysis_human <- function(input, fdr, logfc, direction, output) {
   # Output parameters of the analysis
@@ -313,22 +230,10 @@ sigora_analysis_human <- function(input, fdr, logfc, direction, output) {
 }
 
 # Perform Sigora analysis using different parameters for the human ortholog and the novel genes
-sigora <- sigora_analysis_human(input=ortholog_novel_DE_MB_2H, fdr=0.05, logfc=0, direction="up", output="Sigora_Up_MB2H(novel).txt")
-sigora <- sigora_analysis_human(input=ortholog_novel_DE_MB_2H, fdr=0.05, logfc=0, direction="down", output="Sigora_Down_MB2H(novel).txt")
 sigora <- sigora_analysis_human(input=ortholog_novel_DE_MB_2H, fdr=0.05, logfc=0, direction="all", output="Sigora_MB2H(novel).txt")
-sigora <- sigora_analysis_human(input=ortholog_novel_DE_MB_2H, fdr=0.001, logfc=0, direction="all", output="Sigora_fdr0.001_MB2H(novel).txt")
-sigora <- sigora_analysis_human(input=ortholog_novel_DE_MB_6H, fdr=0.05, logfc=0, direction="up", output="Sigora_Up_MB6H(novel).txt")
-sigora <- sigora_analysis_human(input=ortholog_novel_DE_MB_6H, fdr=0.05, logfc=0, direction="down", output="Sigora_Down_MB6H(novel).txt")
 sigora <- sigora_analysis_human(input=ortholog_novel_DE_MB_6H, fdr=0.05, logfc=0, direction="all", output="Sigora_MB6H(novel).txt")
-sigora <- sigora_analysis_human(input=ortholog_novel_DE_MB_6H, fdr=0.001, logfc=0, direction="all", output="Sigora_fdr0.001_MB6H(novel).txt")
-sigora <- sigora_analysis_human(input=ortholog_novel_DE_MB_24H, fdr=0.05, logfc=0, direction="up", output="Sigora_Up_MB24H(novel).txt")
-sigora <- sigora_analysis_human(input=ortholog_novel_DE_MB_24H, fdr=0.05, logfc=0, direction="down", output="Sigora_Down_MB24H(novel).txt")
 sigora <- sigora_analysis_human(input=ortholog_novel_DE_MB_24H, fdr=0.05, logfc=0, direction="all", output="Sigora_MB24H(novel).txt")
-sigora <- sigora_analysis_human(input=ortholog_novel_DE_MB_24H, fdr=0.001, logfc=0, direction="all", output="Sigora_fdr0.001_MB24H(novel).txt")
-sigora <- sigora_analysis_human(input=ortholog_novel_DE_MB_48H, fdr=0.05, logfc=0, direction="up", output="Sigora_Up_MB48H(novel).txt")
-sigora <- sigora_analysis_human(input=ortholog_novel_DE_MB_48H, fdr=0.05, logfc=0, direction="down", output="Sigora_Down_MB48H(novel).txt")
 sigora <- sigora_analysis_human(input=ortholog_novel_DE_MB_48H, fdr=0.05, logfc=0, direction="all", output="Sigora_MB48H(novel).txt")
-sigora <- sigora_analysis_human(input=ortholog_novel_DE_MB_48H, fdr=0.001, logfc=0, direction="all", output="Sigora_fdr0.001_MB48H(novel).txt")
 
 # Clean up the unrequired variables
 remove(sig_id, sigora, summary_results, detailed_results)

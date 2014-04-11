@@ -6,30 +6,8 @@
 # List of required packages #
 #############################
 
-# Create a function to load or install (then load) the required packages
-loadpackage <- function(package) {
-  if (require(package=deparse(substitute(package)), character.only=TRUE, quietly=TRUE)) {
-    print(paste(deparse(substitute(package)), " is loaded correctly!", sep=""))
-  }
-  else {
-    print(paste("Trying to install ", deparse(substitute(package)), sep=""))
-    install.packages(pkgs=deparse(substitute(package)), quiet=TRUE)
-    if(require(package=deparse(substitute(package)), character.only=TRUE, quietly=TRUE)) {
-      print(paste(deparse(substitute(package)), " is correctly installed and loaded from CRAN!", sep=""))
-    }
-    else {
-      source(file="http://bioconductor.org/biocLite.R", verbose=FALSE)
-      biocLite(pkgs=deparse(substitute(package)), suppressUpdates=TRUE)
-      if(require(package=deparse(substitute(package)), character.only=TRUE, quietly=TRUE)) {
-        print(paste(deparse(substitute(package)), " is correctly installed and loaded from Bioconductor!", sep=""))
-      }
-      else {
-        stop(paste('"', "Could not install ", deparse(substitute(package)), '"', sep=""))
-      }
-    }
-  }
-  print(paste(deparse(substitute(package)), " version: ", packageVersion(pkg=deparse(substitute(package))), sep=""))
-}
+# Source the common functions used across this script
+source(file="F:/nnalpas/Documents/PhD project/Bioinformatics/R/General_function.R")
 
 # Load the required packages
 loadpackage(package=flowCore)
@@ -73,16 +51,6 @@ alv_mac_gate1 <- Subset(x=alv_mac, subset=gate1)
 summary(filter(x=alv_mac, filter=gate1))
 capture.output(summary(filter(x=alv_mac, filter=gate1)), file="Gate1.txt", append=TRUE)
 
-# Plot the data for gate1 (optional since all gates for each samples are plotted later on)
-#for (i in 1:36) {
-#  file_name <- gsub(pattern=".fcs$", replacement="_gate1.png", x=sampleNames(alv_mac)[i], perl=TRUE)
-#  png(filename=file_name, width=1000, height=1000, units="px")
-#  plot(transform(alv_mac[[i]], FS_log=(`FS Log`), SS_log=(`SS Log`)), c("FS_log", "SS_log"), log="xy", main=file_name, smooth=FALSE, col=rgb(240,34,34,150,maxColorValue=255))
-#  rect(750, 75, 8000, 7800)
-#  text(x=1400, y=6000, labels="gate1")
-#  dev.off()
-#}
-
 ######################################
 # Create gate2 FS area versus FS lin #
 ######################################
@@ -98,16 +66,6 @@ alv_mac_gate2 <- Subset(x=alv_mac_gate1, subset=gate2)
 # Check the data
 summary(filter(x=alv_mac_gate1, filter=gate2))
 capture.output(summary(filter(x=alv_mac_gate1, filter=gate2)), file="Gate2.txt", append=TRUE)
-
-# Plot the data for gate2 (optional since all gates for each samples are plotted later on)
-#for (i in 1:36) {
-#  file_name <- gsub(pattern=".fcs$", replacement="_gate2.png", x=sampleNames(alv_mac)[i], perl=TRUE)
-#  png(filename=file_name, width=1000, height=1000, units="px")
-#  plot(transform(alv_mac_gate1[[i]], FS_area=(`FS Area`), FS_lin=(`FS Lin`)), c("FS_area", "FS_lin"), main=file_name, smooth=FALSE, col=rgb(240,34,34,150,maxColorValue=255))
-#  polygon(x=c(17000,60000,58000,17000), y=c(9000,33000,43000,16000))
-#  text(x=14000, y=18000, labels="gate2")
-#  dev.off()
-#}
 
 ###########################################
 # Create gate3 SS area versus Pulse width #
@@ -125,16 +83,6 @@ alv_mac_gate3 <- Subset(x=alv_mac_gate2, subset=gate3)
 summary(filter(x=alv_mac_gate2, filter=gate3))
 capture.output(summary(filter(x=alv_mac_gate2, filter=gate3)), file="Gate3.txt", append=TRUE)
 
-# Plot the data for gate3 (optional since all gates for each samples are plotted later on)
-#for (i in 1:36) {
-#  file_name <- gsub(pattern=".fcs$", replacement="_gate3.png", x=sampleNames(alv_mac)[i], perl=TRUE)
-#  png(filename=file_name, width=1000, height=1000, units="px")
-#  plot(transform(alv_mac_gate2[[i]], SS_area=(`SS Area`), Pulse_width=(`Pulse Width`)), c("SS_area", "Pulse_width"), main=file_name, smooth=FALSE, col=rgb(240,34,34,150,maxColorValue=255))
-#  polygon(x=c(12000,59000,60000,25000,10000), y=c(40,70,110,100,80))
-#  text(x=9000, y=100, labels="gate3")
-#  dev.off()
-#}
-
 ###########################################
 # Create gate4 FS area versus Pulse width #
 ###########################################
@@ -151,16 +99,6 @@ alv_mac_gate4 <- Subset(x=alv_mac_gate3, subset=gate4)
 summary(filter(x=alv_mac_gate3, filter=gate4))
 capture.output(summary(filter(x=alv_mac_gate3, filter=gate4)), file="Gate4.txt", append=TRUE)
 
-# Plot the data for gate4 (optional since all gates for each samples are plotted later on)
-#for (i in 1:36) {
-#  file_name <- gsub(pattern=".fcs$", replacement="_gate4.png", x=sampleNames(alv_mac)[i], perl=TRUE)
-#  png(filename=file_name, width=1000, height=1000, units="px")
-#  plot(transform(alv_mac_gate3[[i]], FS_area=(`FS Area`), Pulse_width=(`Pulse Width`)), c("FS_area", "Pulse_width"), main=file_name, smooth=FALSE, col=rgb(240,34,34,150,maxColorValue=255))
-#  polygon(x=c(18000,61000,61000,31000,17000), y=c(40,70,125,115,90))
-#  text(x=14000, y=100, labels="gate4")
-#  dev.off()
-#}
-
 #######################################
 # Create gate5 FL 1 Log (alias CD14+) #
 #######################################
@@ -172,16 +110,6 @@ gate5 <- rectangleGate(filterId="gate5", `FL 1 Log`=c(17,10000))
 summary(filter(x=alv_mac_gate4, filter=gate5))
 capture.output(summary(filter(x=alv_mac_gate4, filter=gate5)), file="Gate5.txt", append=TRUE)
 
-# Plot the data for gate5 (optional since all gates for each samples are plotted later on)
-#for (i in 1:36) {
-#  file_name <- gsub(pattern=".fcs$", replacement="_gate5.png", x=sampleNames(alv_mac)[i], perl=TRUE)
-#  png(filename=file_name, width=1000, height=1000, units="px")
-#  plot(transform(alv_mac_gate4[[i]], CD14_log=(`FL 1 Log`), Event_Count=sqrt(`Event Count`)), c("CD14_log", "Event_Count"), log="x", main=file_name, smooth=FALSE, col=rgb(240,34,34,150,maxColorValue=255))
-#  rect(17, 0.01, 10000, 256)
-#  text(x=50, y=245, labels="gate5")
-#  dev.off()
-#}
-
 #####################################
 # Create gate6 FL 2 Log (alias PE+) #
 #####################################
@@ -192,16 +120,6 @@ gate6 <- rectangleGate(filterId="gate6", `FL 2 Log`=c(17,10000))
 # Obtain summary for PE+ cells
 summary(filter(x=alv_mac_gate4, filter=gate6))
 capture.output(summary(filter(x=alv_mac_gate4, filter=gate6)), file="Gate6.txt", append=TRUE)
-
-# Plot the data for gate6 (optional since all gates for each samples are plotted later on)
-#for (i in 1:36) {
-#  file_name <- gsub(pattern=".fcs$", replacement="_gate6.png", x=sampleNames(alv_mac)[i], perl=TRUE)
-#  png(filename=file_name, width=1000, height=1000, units="px")
-#  plot(transform(alv_mac_gate4[[i]], PE_log=(`FL 2 Log`), Event_Count=sqrt(`Event Count`)), c("PE_log", "Event_Count"), log="x", main=file_name, smooth=FALSE, col=rgb(240,34,34,150,maxColorValue=255))
-#  rect(17, 0.01, 10000, 256)
-#  text(x=50, y=245, labels="gate6")
-#  dev.off()
-#}
 
 ##############################################
 # Plot all gates into single plot per sample #

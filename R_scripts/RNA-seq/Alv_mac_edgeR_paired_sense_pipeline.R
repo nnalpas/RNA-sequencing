@@ -8,30 +8,8 @@
 # List of required packages #
 #############################
 
-# Create a function to load or install (then load) the required packages
-loadpackage <- function(package) {
-  if (require(package=deparse(substitute(package)), character.only=TRUE, quietly=TRUE)) {
-    print(paste(deparse(substitute(package)), " is loaded correctly!", sep=""))
-  }
-  else {
-    print(paste("Trying to install ", deparse(substitute(package)), sep=""))
-    install.packages(pkgs=deparse(substitute(package)), quiet=TRUE)
-    if(require(package=deparse(substitute(package)), character.only=TRUE, quietly=TRUE)) {
-      print(paste(deparse(substitute(package)), " is correctly installed and loaded from CRAN!", sep=""))
-    }
-    else {
-      source(file="http://bioconductor.org/biocLite.R", verbose=FALSE)
-      biocLite(pkgs=deparse(substitute(package)), suppressUpdates=TRUE)
-      if(require(package=deparse(substitute(package)), character.only=TRUE, quietly=TRUE)) {
-        print(paste(deparse(substitute(package)), " is correctly installed and loaded from Bioconductor!", sep=""))
-      }
-      else {
-        stop(paste('"', "Could not install ", deparse(substitute(package)), '"', sep=""))
-      }
-    }
-  }
-  print(paste(deparse(substitute(package)), " version: ", packageVersion(pkg=deparse(substitute(package))), sep=""))
-}
+# Source the common functions used across this script
+source(file="F:/nnalpas/Documents/PhD project/Bioinformatics/R/General_function.R")
 
 # Load the required packages
 loadpackage(package=edgeR)
@@ -327,46 +305,6 @@ names(Alv_fit)
 ################################
 # Differential expression call #
 ################################
-
-# Create a function to perform the differential expression within edgeR according to provided parameters
-diff_expr_edgeR <- function(treat1, treat2, data, design, group, adjpvalue, method, LRTdata, DEdata, DEfile, Smearfile) {
-  if(length(grep(pattern=treat1, x=colnames(design)))==1 && length(grep(pattern=treat2, x=colnames(design)))==1) {
-    contr <- rep(x=0, times=length(colnames(design)))
-    contr[c(grep(pattern=treat1, x=colnames(design)), grep(pattern=treat2, x=colnames(design)))] <- c(1, -1)
-    lrt <- glmLRT(glmfit=data, contrast=contr)
-  }
-  else if(length(grep(pattern=treat1, x=colnames(design)))==0 && length(grep(pattern=treat1, x=levels(group)))==1) {
-    contr <- grep(pattern=treat2, x=colnames(design))
-    lrt <- glmLRT(glmfit=data, coef=contr)
-  }
-  else if(length(grep(pattern=treat2, x=colnames(design)))==0 && length(grep(pattern=treat2, x=levels(group)))==1) {
-    contr <- grep(pattern=treat1, x=colnames(design))
-    lrt <- glmLRT(glmfit=data, coef=contr)
-  }
-  else {
-    stop("Error: Check that the treatments provided are in group table!")
-  }
-  de <- topTags(object=lrt, n="inf", adjust.method=method)
-  print("Names of the edgeR likeli-hood ratio test dataframe:")
-  print(names(lrt))
-  print("Comparison perfomed in the edgeR likeli-hood ratio test:")
-  print(lrt$comparison)
-  print("Heading of the edgeR likeli-hood ratio test dataframe:")
-  print(head(lrt$table))
-  print("Summary of the number od edgeR DEG:")
-  print(summary(decideTestsDGE(lrt, p.value=adjpvalue)))
-  print("Names of the edgeR multiple correction test dataframe:")
-  print(names(de))
-  print("Heading of the edgeR multiple correction test dataframe:")
-  print(head(de$table))
-  write.table(x=de$table[,c("external_gene_id","description","logFC", "logCPM", "LR", "PValue", "FDR")], file=paste(DEfile, "txt", sep="."), sep="\t", quote=FALSE, row.names=TRUE, col.names=TRUE)
-  png(filename=paste(Smearfile, "png", sep="."), width=1366, height=768, units="px")
-  plotSmear(object=lrt, de.tags=(rownames(lrt$table)[as.logical(decideTestsDGE(lrt, p.value = 0.05))]))
-  abline(h=c(-1, 1), col="blue")
-  dev.off()
-  assign(x=LRTdata, value=lrt, envir=.GlobalEnv)
-  assign(x=DEdata, value=de, envir=.GlobalEnv)
-}
 
 # Test for differential expression between the different time points/treatments
 diff_expr_edgeR(treat1="MB.2H", treat2="CN.2H", data=Alv_fit, design=design, group=group, adjpvalue=0.05, method="BH", LRTdata="Alv_lrt_MB.2H", DEdata="DE_MB.2H", DEfile="DE_MB_sense.2H", Smearfile="Smear_FC_CPM_MB.2H")
