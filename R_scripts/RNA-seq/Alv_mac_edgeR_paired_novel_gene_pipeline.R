@@ -15,6 +15,8 @@ source(file="F:/nnalpas/Documents/PhD project/Bioinformatics/R/General_function.
 loadpackage(package=edgeR)
 loadpackage(package=biomaRt)
 loadpackage(package=MASS)
+loadpackage(package=ggplot2)
+loadpackage(package=grid)
 
 ######################################################
 # Use featureCounts output files as input files in R #
@@ -206,45 +208,18 @@ dev.off()
 # Multidimensional scaling plot on all samples #
 ################################################
 
-# Code below will output the MDS plot in directory as a png file
-png(filename="MDS_Alv_mac.png", width=1366, height=768, units="px")
-MDS <- plotMDS(x=Alv_norm, top=1000000, gene.selection="pairwise", xlab="Dimension 1", ylab="Dimension 2")
-#points(x=MDS$cmdscale.out[,1], y=MDS$cmdscale.out[,2], type = "p", pch=c(15,17), col=rep(c(4, 2), times=6))
-dev.off()
+# Output value for MDS plot (dimension 1 and 3 in this case)
+MDS <- plotMDS(x=Alv_norm, top=1000000, gene.selection="pairwise", xlab="Dimension 1", ylab="Dimension 3", dim.plot=c(1,3), cex=2.0)
 
-# More visually friendly version of the MDS plot
-symbol <- vector()
-color <- vector()
-for (i in 1:ncol(Alv_norm$counts)) {
-  if (length(grep(pattern="CN", x=colnames(Alv_norm$counts)[i]))==1) {
-    symbol <- c(symbol, "o")
-  }
-  if (length(grep(pattern="MB", x=colnames(Alv_norm$counts)[i]))==1) {
-    symbol <- c(symbol, "+")
-  }
-  if (length(grep(pattern="0H", x=colnames(Alv_norm$counts)[i]))==1) {
-    color <- c(color, "black")
-  }
-  if (length(grep(pattern="2H", x=colnames(Alv_norm$counts)[i]))==1) {
-    color <- c(color, "gold")
-  }
-  if (length(grep(pattern="6H", x=colnames(Alv_norm$counts)[i]))==1) {
-    color <- c(color, "green")
-  }
-  if (length(grep(pattern="24H", x=colnames(Alv_norm$counts)[i]))==1) {
-    color <- c(color, "blue")
-  }
-  if (length(grep(pattern="48H", x=colnames(Alv_norm$counts)[i]))==1) {
-    color <- c(color, "red")
-  }
-}
+# MDS values are then plotted with ggplot2
+MDS_ggplot <- data.frame(target, MDS$x, MDS$y)
+MDS_ggplot <- MDS_ggplot[,-1]
 png(filename="MDS_Alv_mac(D1_vs_D3).png", width=1600, height=1000, units="px")
-MDS <- plotMDS(x=Alv_norm, top=1000000, gene.selection="pairwise", xlab="Dimension 1", ylab="Dimension 3", col=color, labels=symbol, dim.plot=c(1,3), cex=2.0)
-legend(x="topleft", legend=c("CN", "MB", "2H", "6H", "24H", "48H"), col=c("black", "black", "gold", "green", "blue", "red"), pch=c(1,3,15,15,15,15), cex=2.0)
+ggplot(data=MDS_ggplot, aes(x=MDS_ggplot$MDS.x, y=MDS_ggplot$MDS.y, shape=MDS_ggplot[,"Treatment"], colour=MDS_ggplot$Time_point))+geom_point(size=12)+theme(panel.background=element_rect(fill='wheat'), legend.title=element_text(size=20, face="bold"), legend.text=element_text(size=15, face="bold"), axis.title.x=element_text(face="bold", size=30), axis.text.x=element_text(face="bold", size=20), axis.title.y=element_text(face="bold", size=30), axis.text.y=element_text(face="bold", size=20), plot.title=element_text(face="bold", size=40))+ggtitle("MDS plot")+xlab("Dimension 1")+ylab("Dimension 3")+scale_shape_discrete(name="Treatment", breaks=c("CN", "MB"), labels=c("Control", expression(italic("M. bovis"))))+scale_colour_discrete(name="Time point\npost-infection", breaks=c("2H", "6H", "24H", "48H"), labels=c("2 hours", "6 hours", "24 hours", "48 hours"))
 dev.off()
 
 # Write into a table the coordinates of each library for the MDS plot
-write.table(x=MDS$cmdscale.out, file="MDS_xy_all_samples.txt", sep="\t", quote=FALSE, row.names=TRUE, col.names=TRUE)
+write.table(x=MDS_ggplot, file="MDS_xy_all_samples.txt", sep="\t", quote=FALSE, row.names=TRUE, col.names=TRUE)
 
 ##############################################
 # Create a design matrix for paired analysis #
