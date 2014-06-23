@@ -13,19 +13,13 @@ loadpackage <- function(package) {
   }
   else {
     print(paste("Trying to install ", deparse(substitute(package)), sep=""))
-    install.packages(pkgs=deparse(substitute(package)), quiet=TRUE)
+    source(file="http://bioconductor.org/biocLite.R", verbose=FALSE)
+    biocLite(pkgs=deparse(substitute(package)), suppressUpdates=TRUE)
     if(require(package=deparse(substitute(package)), character.only=TRUE, quietly=TRUE)) {
-      print(paste(deparse(substitute(package)), " is correctly installed and loaded from CRAN!", sep=""))
+      print(paste(deparse(substitute(package)), " is correctly installed and loaded!", sep=""))
     }
     else {
-      source(file="http://bioconductor.org/biocLite.R", verbose=FALSE)
-      biocLite(pkgs=deparse(substitute(package)), suppressUpdates=TRUE)
-      if(require(package=deparse(substitute(package)), character.only=TRUE, quietly=TRUE)) {
-        print(paste(deparse(substitute(package)), " is correctly installed and loaded from Bioconductor!", sep=""))
-      }
-      else {
-        stop(paste('"', "Could not install ", deparse(substitute(package)), '"', sep=""))
-      }
+      stop(paste('"', "Could not install ", deparse(substitute(package)), '"', sep=""))
     }
   }
   print(paste(deparse(substitute(package)), " version: ", packageVersion(pkg=deparse(substitute(package))), sep=""))
