@@ -5,8 +5,8 @@ RNA-sequencing
 
 Repository containing all custom pipeline, perl scripts and R scripts used for RNA-sequencing data analyses.
 
-These have been published as part of a submitted publication:
-Nalpas, N. C. et al. 2014 "Alveolar macrophage response to Mycobacterium bovis infection"
+These will be published as part of a submitted publication:
+Nalpas, N.C. et al. 2014 "Alveolar macrophage response to Mycobacterium bovis infection" (submission process)
 
 
 In order to use the provided pipeline and scripts, user should refer first to the RNA-seq_pipeline.txt file, which will lead to the diverse other scripts.
@@ -16,10 +16,14 @@ Further README files may be added for each scripts, in order to facilitate user'
 
 For any inquirements concerning our article or repository, please contact:
 
-Nalpas, N. C.
+Nalpas, N.C.
 nicolas.nalpas@ucdconnect.ie
 
 or
 
-MacHugh, D. E.
+MacHugh, D.E.
 david.machugh@ucd.ie
+
+
+DOI badge
+https://zenodo.org/badge/doi/10.5281/zenodo.10668.png
