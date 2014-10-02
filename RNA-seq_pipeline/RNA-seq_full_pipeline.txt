@@ -82,7 +82,7 @@ done
 cd /home/dmagee/scratch/ALV_MAC_RNAseq/quality_check
 mkdir /home/dmagee/scratch/ALV_MAC_RNAseq/quality_check/tmp
 for file in `ls *_fastqc.zip`; do unzip $file -d /home/dmagee/scratch/ALV_MAC_RNAseq/quality_check/tmp; done;
-for file in `find /home/dmagee/scratch/ALV_MAC_RNAseq/quality_check/tmp -name summary.txt`; do m $file | grep "FAIL" >> fastqc_unfiltered_fail.txt; done;
+for file in `find /home/dmagee/scratch/ALV_MAC_RNAseq/quality_check/tmp -name summary.txt`; do more $file | grep "FAIL" >> fastqc_unfiltered_fail.txt; done;
 rm -rf /home/dmagee/scratch/ALV_MAC_RNAseq/quality_check/tmp
 
 
@@ -113,7 +113,7 @@ nohup ./$script > ${script}.nohup &
 done
 
 # Check very carefully the different perl script outputs per pool_fastq_file to see if all reads have been processed; the .report file gives you all statistics you need in terms of number of reads per individual samples, tags occurence ...
-m [lane_fastq_file].report
+more [lane_fastq_file].report
 
 # Compile all deconvolution reports into a single file
 cd /workspace/scratch/dmagee/ALV_MAC_RNAseq/fastq_sequence/
@@ -150,7 +150,7 @@ done
 cd /home/dmagee/scratch/ALV_MAC_RNAseq/quality_check
 mkdir $HOME/scratch/ALV_MAC_RNAseq/quality_check/tmp
 for file in `ls *pe*_fastqc.zip`; do unzip $file -d $HOME/scratch/ALV_MAC_RNAseq/quality_check/tmp; done;
-for file in `find $HOME/scratch/ALV_MAC_RNAseq/quality_check/tmp -name summary.txt`; do m $file | grep "FAIL" >> fastqc_fail.txt; done;
+for file in `find $HOME/scratch/ALV_MAC_RNAseq/quality_check/tmp -name summary.txt`; do more $file | grep "FAIL" >> fastqc_fail.txt; done;
 rm -rf $HOME/scratch/ALV_MAC_RNAseq/quality_check/tmp
 
 # Tidy up the quality_check directory
@@ -230,7 +230,7 @@ done
 cd /home/dmagee/scratch/ALV_MAC_RNAseq/quality_check/post_alignment
 mkdir /home/dmagee/scratch/ALV_MAC_RNAseq/quality_check/post_alignment/tmp
 for file in `ls *_fastqc.zip`; do unzip $file -d /home/dmagee/scratch/ALV_MAC_RNAseq/quality_check/post_alignment/tmp; done;
-for file in `find /home/dmagee/scratch/ALV_MAC_RNAseq/quality_check/post_alignment/tmp -name summary.txt`; do m $file | grep "FAIL" >> fastqc_aligned_fail.txt; done;
+for file in `find /home/dmagee/scratch/ALV_MAC_RNAseq/quality_check/post_alignment/tmp -name summary.txt`; do more $file | grep "FAIL" >> fastqc_aligned_fail.txt; done;
 rm -rf /home/dmagee/scratch/ALV_MAC_RNAseq/quality_check/post_alignment/tmp
 
 
@@ -461,11 +461,11 @@ cd /workspace/scratch/dmagee/ALV_MAC_RNAseq/Novel_transcripts/Merge/merged_asm
 
 # Summarise quickly the new annotation file
 echo "# Number of transcripts:" > summary_new_annotation.txt
-m merged.gtf | grep -P -o "exon_number \"1\".*class_code \".\"" | grep -P -o "class_code \".\"" | sort | uniq -c >> summary_new_annotation.txt
+more merged.gtf | grep -P -o "exon_number \"1\".*class_code \".\"" | grep -P -o "class_code \".\"" | sort | uniq -c >> summary_new_annotation.txt
 
 # Obtain the list of novel transcripts ID (and also natural antisense transcripts ID, even if they probably will not be used)
-m merged.gtf | grep -P "class_code \"u\"" | grep -Po "transcript_id \"TCONS_\d*\"" | grep -Po "TCONS_\d*" | sort | uniq >> Novel_id.txt
-m merged.gtf | grep -P "class_code \"x\"" | grep -Po "transcript_id \"TCONS_\d*\"" | grep -Po "TCONS_\d*" | sort | uniq >> NAT_id.txt
+more merged.gtf | grep -P "class_code \"u\"" | grep -Po "transcript_id \"TCONS_\d*\"" | grep -Po "TCONS_\d*" | sort | uniq >> Novel_id.txt
+more merged.gtf | grep -P "class_code \"x\"" | grep -Po "transcript_id \"TCONS_\d*\"" | grep -Po "TCONS_\d*" | sort | uniq >> NAT_id.txt
 
 # Obtain the annotation for the novel transcripts (and also the NAT)
 nohup perl /home/nnalpas/SVN/Grep_file2_based_on_file1.pl -file1 Novel_id.txt -file2 merged.gtf -output Bos_taurus.novel.gtf &
