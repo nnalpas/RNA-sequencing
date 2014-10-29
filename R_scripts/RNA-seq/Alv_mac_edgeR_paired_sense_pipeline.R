@@ -17,6 +17,7 @@ loadpackage(package=biomaRt)
 loadpackage(package=MASS)
 loadpackage(package=ggplot2)
 loadpackage(package=grid)
+loadpackage(RColorBrewer)
 
 ######################################################
 # Use featureCounts output files as input files in R #
@@ -227,6 +228,54 @@ dev.off()
 
 # Write into a table the coordinates of each library for the MDS plot
 write.table(x=MDS_ggplot, file="MDS_xy_all_samples.txt", sep="\t", quote=FALSE, row.names=TRUE, col.names=TRUE)
+
+# MDS values are generated at 2H
+MDS <- plotMDS(x=Alv_norm[,grep(pattern="2H", x=colnames(Alv_norm))], top=1000000, gene.selection="pairwise", xlab="Dimension 1", ylab="Dimension 2", dim.plot=c(1,2), cex=2.0)
+MDS_ggplot_2H <- data.frame(target[grep(pattern="2H", x=target$Samples),], MDS$x, MDS$y)
+rownames(MDS_ggplot_2H) <- MDS_ggplot_2H$Samples
+MDS_ggplot_2H <- MDS_ggplot_2H[,-1]
+write.table(x=MDS_ggplot_2H, file="MDS_xy_2H.txt", sep="\t", quote=FALSE, row.names=TRUE, col.names=TRUE)
+
+# MDS values are generated at 6H
+MDS <- plotMDS(x=Alv_norm[,grep(pattern="6H", x=colnames(Alv_norm))], top=1000000, gene.selection="pairwise", xlab="Dimension 1", ylab="Dimension 2", dim.plot=c(1,2), cex=2.0)
+MDS_ggplot_6H <- data.frame(target[grep(pattern="6H", x=target$Samples),], MDS$x, MDS$y)
+rownames(MDS_ggplot_6H) <- MDS_ggplot_6H$Samples
+MDS_ggplot_6H <- MDS_ggplot_6H[,-1]
+write.table(x=MDS_ggplot_6H, file="MDS_xy_6H.txt", sep="\t", quote=FALSE, row.names=TRUE, col.names=TRUE)
+
+# MDS values are generated at 24H
+MDS <- plotMDS(x=Alv_norm[,grep(pattern="24H", x=colnames(Alv_norm))], top=1000000, gene.selection="pairwise", xlab="Dimension 1", ylab="Dimension 2", dim.plot=c(1,2), cex=2.0)
+MDS_ggplot_24H <- data.frame(target[grep(pattern="24H", x=target$Samples),], MDS$x, MDS$y)
+rownames(MDS_ggplot_24H) <- MDS_ggplot_24H$Samples
+MDS_ggplot_24H <- MDS_ggplot_24H[,-1]
+write.table(x=MDS_ggplot_24H, file="MDS_xy_24H.txt", sep="\t", quote=FALSE, row.names=TRUE, col.names=TRUE)
+
+# MDS values are generated at 48H
+MDS <- plotMDS(x=Alv_norm[,grep(pattern="48H", x=colnames(Alv_norm))], top=1000000, gene.selection="pairwise", xlab="Dimension 1", ylab="Dimension 2", dim.plot=c(1,2), cex=2.0)
+MDS_ggplot_48H <- data.frame(target[grep(pattern="48H", x=target$Samples),], MDS$x, MDS$y)
+rownames(MDS_ggplot_48H) <- MDS_ggplot_48H$Samples
+MDS_ggplot_48H <- MDS_ggplot_48H[,-1]
+write.table(x=MDS_ggplot_48H, file="MDS_xy_48H.txt", sep="\t", quote=FALSE, row.names=TRUE, col.names=TRUE)
+
+# Prepare all MDS plot with ggplot2
+manual_colors <- brewer.pal(4, name = "Set1")
+plot1 <- ggplot(data=MDS_ggplot_2H, aes(x=MDS_ggplot_2H$MDS.x, y=MDS_ggplot_2H$MDS.y, shape=MDS_ggplot_2H[,"Treatment"], colour=MDS_ggplot_2H$Time_point))+geom_point(size=12)+theme(panel.background=element_rect(fill='wheat'), legend.title=element_text(size=20, face="bold"), legend.text=element_text(size=15, face="bold"), axis.title.x=element_text(face="bold", size=30), axis.text.x=element_text(face="bold", size=20), axis.title.y=element_text(face="bold", size=30), axis.text.y=element_text(face="bold", size=20), plot.title=element_text(face="bold", size=40))+ggtitle("2H")+xlab("Dimension 1")+ylab("Dimension 2")+scale_shape_discrete(name="Treatment", breaks=c("CN", "MB"), labels=c("Control", expression(italic("M. bovis"))))+scale_colour_manual(name="Time point\npost-infection", breaks=c("2H"), labels=c("2 hours"), values = manual_colors[1])
+plot2 <- ggplot(data=MDS_ggplot_6H, aes(x=MDS_ggplot_6H$MDS.x, y=MDS_ggplot_6H$MDS.y, shape=MDS_ggplot_6H[,"Treatment"], colour=MDS_ggplot_6H$Time_point))+geom_point(size=12)+theme(panel.background=element_rect(fill='wheat'), legend.title=element_text(size=20, face="bold"), legend.text=element_text(size=15, face="bold"), axis.title.x=element_text(face="bold", size=30), axis.text.x=element_text(face="bold", size=20), axis.title.y=element_text(face="bold", size=30), axis.text.y=element_text(face="bold", size=20), plot.title=element_text(face="bold", size=40))+ggtitle("6H")+xlab("Dimension 1")+ylab("Dimension 2")+scale_shape_discrete(name="Treatment", breaks=c("CN", "MB"), labels=c("Control", expression(italic("M. bovis"))))+scale_colour_manual(name="Time point\npost-infection", breaks=c("6H"), labels=c("6 hours"), values = manual_colors[2])
+plot3 <- ggplot(data=MDS_ggplot_24H, aes(x=MDS_ggplot_24H$MDS.x, y=MDS_ggplot_24H$MDS.y, shape=MDS_ggplot_24H[,"Treatment"], colour=MDS_ggplot_24H$Time_point))+geom_point(size=12)+theme(panel.background=element_rect(fill='wheat'), legend.title=element_text(size=20, face="bold"), legend.text=element_text(size=15, face="bold"), axis.title.x=element_text(face="bold", size=30), axis.text.x=element_text(face="bold", size=20), axis.title.y=element_text(face="bold", size=30), axis.text.y=element_text(face="bold", size=20), plot.title=element_text(face="bold", size=40))+ggtitle("24H")+xlab("Dimension 1")+ylab("Dimension 2")+scale_shape_discrete(name="Treatment", breaks=c("CN", "MB"), labels=c("Control", expression(italic("M. bovis"))))+scale_colour_manual(name="Time point\npost-infection", breaks=c("24H"), labels=c("24 hours"), values = manual_colors[3])
+plot4 <- ggplot(data=MDS_ggplot_48H, aes(x=MDS_ggplot_48H$MDS.x, y=MDS_ggplot_48H$MDS.y, shape=MDS_ggplot_48H[,"Treatment"], colour=MDS_ggplot_48H$Time_point))+geom_point(size=12)+theme(panel.background=element_rect(fill='wheat'), legend.title=element_text(size=20, face="bold"), legend.text=element_text(size=15, face="bold"), axis.title.x=element_text(face="bold", size=30), axis.text.x=element_text(face="bold", size=20), axis.title.y=element_text(face="bold", size=30), axis.text.y=element_text(face="bold", size=20), plot.title=element_text(face="bold", size=40))+ggtitle("48H")+xlab("Dimension 1")+ylab("Dimension 2")+scale_shape_discrete(name="Treatment", breaks=c("CN", "MB"), labels=c("Control", expression(italic("M. bovis"))))+scale_colour_manual(name="Time point\npost-infection", breaks=c("48H"), labels=c("48 hours"), values = manual_colors[4])
+
+# Create a single picture with all plots
+tiff(filename="MDS_Alv_mac_per_time(D1_vs_D2).tiff", width=1600, height=1000, units="px")
+grid.newpage()
+pushViewport(viewport(layout=grid.layout(2, 2, heights = unit(c(4, 4), "null"))))
+print(plot1, vp=viewport(layout.pos.row=1, layout.pos.col=1))
+print(plot2, vp=viewport(layout.pos.row=1, layout.pos.col=2))
+print(plot3, vp=viewport(layout.pos.row=2, layout.pos.col=1))
+print(plot4, vp=viewport(layout.pos.row=2, layout.pos.col=2))
+dev.off()
+
+# Remove all non required variables
+rm(MDS_ggplot_2H, MDS_ggplot_6H, MDS_ggplot_24H, MDS_ggplot_48H, plot1, plot2, plot3, plot4, manual_colors)
 
 ##############################################
 # Create a design matrix for paired analysis #
